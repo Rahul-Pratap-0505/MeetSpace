@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { User, Session, AuthChangeEvent } from '@supabase/supabase-js'
+import { User, Session } from '@supabase/supabase-js'
 import { supabase } from '@/integrations/supabase/client'
 
 type AuthContextType = {
@@ -38,12 +38,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
 
-      // Create profile on sign up - using correct event comparison
+      // Create profile on sign up - check string value directly
       if (event === 'SIGNED_UP' && session?.user) {
         // Profile creation is now handled by the database trigger
         console.log('User signed up:', session.user.email)

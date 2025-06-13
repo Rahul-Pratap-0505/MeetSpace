@@ -78,20 +78,31 @@ const Chat = () => {
     if (!currentRoom) return
 
     try {
-      const { data, error } = await supabase
+      // Fetch messages and manually join with profiles
+      const { data: messagesData, error: messagesError } = await supabase
         .from('messages')
-        .select(`
-          *,
-          profiles (
-            username,
-            avatar_url
-          )
-        `)
+        .select('*')
         .eq('room_id', currentRoom)
         .order('created_at', { ascending: true })
 
-      if (error) throw error
-      setMessages(data || [])
+      if (messagesError) throw messagesError
+
+      // Fetch all unique sender profiles
+      const senderIds = [...new Set(messagesData?.map(m => m.sender_id) || [])]
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username, avatar_url')
+        .in('id', senderIds)
+
+      if (profilesError) throw profilesError
+
+      // Combine messages with profiles
+      const messagesWithProfiles = messagesData?.map(message => ({
+        ...message,
+        profiles: profilesData?.find(profile => profile.id === message.sender_id) || null
+      })) || []
+
+      setMessages(messagesWithProfiles)
     } catch (error: any) {
       toast.error('Error fetching messages: ' + error.message)
     }
@@ -109,21 +120,20 @@ const Chat = () => {
           filter: `room_id=eq.${currentRoom}`,
         },
         async (payload) => {
-          // Fetch the complete message with profile data
-          const { data, error } = await supabase
-            .from('messages')
-            .select(`
-              *,
-              profiles (
-                username,
-                avatar_url
-              )
-            `)
-            .eq('id', payload.new.id)
+          // Fetch the profile for the new message
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('username, avatar_url')
+            .eq('id', payload.new.sender_id)
             .single()
 
-          if (!error && data) {
-            setMessages((prev) => [...prev, data])
+          if (!profileError && profileData) {
+            const newMessage = {
+              ...payload.new,
+              profiles: profileData
+            } as Message
+
+            setMessages((prev) => [...prev, newMessage])
           }
         }
       )
