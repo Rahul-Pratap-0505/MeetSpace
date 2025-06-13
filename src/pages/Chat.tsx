@@ -34,6 +34,7 @@ const Chat = () => {
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const channelRef = useRef<any>(null)
 
   useEffect(() => {
     fetchRooms()
@@ -43,6 +44,14 @@ const Chat = () => {
     if (currentRoom) {
       fetchMessages()
       subscribeToMessages()
+    }
+
+    // Cleanup function to unsubscribe when room changes or component unmounts
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)
+        channelRef.current = null
+      }
     }
   }, [currentRoom])
 
@@ -109,8 +118,14 @@ const Chat = () => {
   }
 
   const subscribeToMessages = () => {
+    // Remove any existing channel subscription
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current)
+    }
+
+    // Create new channel with unique name
     const channel = supabase
-      .channel('messages')
+      .channel(`messages-${currentRoom}`)
       .on(
         'postgres_changes',
         {
@@ -139,9 +154,8 @@ const Chat = () => {
       )
       .subscribe()
 
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    // Store reference to the channel
+    channelRef.current = channel
   }
 
   const sendMessage = async (e: React.FormEvent) => {
