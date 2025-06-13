@@ -82,7 +82,7 @@ const Chat = () => {
         .from('messages')
         .select(`
           *,
-          profiles!messages_sender_id_fkey (
+          profiles (
             username,
             avatar_url
           )
@@ -114,7 +114,7 @@ const Chat = () => {
             .from('messages')
             .select(`
               *,
-              profiles!messages_sender_id_fkey (
+              profiles (
                 username,
                 avatar_url
               )
