@@ -7,6 +7,8 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { toast } from 'sonner'
 import { Send, LogOut, MessageCircle, Users } from 'lucide-react'
+import CreateRoomDialog from '@/components/CreateRoomDialog'
+import MessageActions from '@/components/MessageActions'
 
 type Message = {
   id: string
@@ -189,6 +191,23 @@ const Chat = () => {
     }
   }
 
+  const generateRoomAvatar = (roomName: string) => {
+    const colors = [
+      'from-blue-400 to-purple-500',
+      'from-green-400 to-blue-500',
+      'from-purple-400 to-pink-500',
+      'from-yellow-400 to-orange-500',
+      'from-red-400 to-pink-500',
+      'from-indigo-400 to-purple-500'
+    ]
+    const colorIndex = roomName.length % colors.length
+    return colors[colorIndex]
+  }
+
+  const handleMessageDeleted = () => {
+    fetchMessages()
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50">
@@ -230,11 +249,16 @@ const Chat = () => {
         {/* Rooms List */}
         <div className="flex-1 overflow-hidden">
           <div className="p-4">
-            <div className="flex items-center space-x-2 mb-3">
-              <Users className="h-4 w-4 text-gray-500" />
-              <span className="text-sm font-medium text-gray-700">Rooms</span>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center space-x-2">
+                <Users className="h-4 w-4 text-gray-500" />
+                <span className="text-sm font-medium text-gray-700">Rooms</span>
+              </div>
             </div>
-            <div className="space-y-1">
+            
+            <CreateRoomDialog onRoomCreated={fetchRooms} />
+            
+            <div className="space-y-1 mt-3">
               {rooms.map((room) => (
                 <button
                   key={room.id}
@@ -245,9 +269,18 @@ const Chat = () => {
                       : 'hover:bg-gray-100 text-gray-700'
                   }`}
                 >
-                  <div className="font-medium">{room.name}</div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    Created {new Date(room.created_at).toLocaleDateString()}
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-8 h-8 bg-gradient-to-r ${generateRoomAvatar(room.name)} rounded-full flex items-center justify-center`}>
+                      <span className="text-white font-medium text-sm">
+                        {room.name.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{room.name}</div>
+                      <div className="text-xs text-gray-500">
+                        Created {new Date(room.created_at).toLocaleDateString()}
+                      </div>
+                    </div>
                   </div>
                 </button>
               ))}
@@ -261,19 +294,23 @@ const Chat = () => {
         {/* Chat Header */}
         <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200 p-4">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-green-400 to-blue-500 rounded-full flex items-center justify-center">
-              <span className="text-white font-medium">
-                {rooms.find(r => r.id === currentRoom)?.name?.charAt(0) || 'R'}
-              </span>
-            </div>
-            <div>
-              <h2 className="font-semibold text-gray-900">
-                {rooms.find(r => r.id === currentRoom)?.name || 'Select a room'}
-              </h2>
-              <p className="text-sm text-gray-500">
-                {messages.length} messages
-              </p>
-            </div>
+            {currentRoom && (
+              <>
+                <div className={`w-10 h-10 bg-gradient-to-r ${generateRoomAvatar(rooms.find(r => r.id === currentRoom)?.name || '')} rounded-full flex items-center justify-center`}>
+                  <span className="text-white font-medium">
+                    {rooms.find(r => r.id === currentRoom)?.name?.charAt(0) || 'R'}
+                  </span>
+                </div>
+                <div>
+                  <h2 className="font-semibold text-gray-900">
+                    {rooms.find(r => r.id === currentRoom)?.name || 'Select a room'}
+                  </h2>
+                  <p className="text-sm text-gray-500">
+                    {messages.length} messages
+                  </p>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -285,7 +322,7 @@ const Chat = () => {
               return (
                 <div
                   key={message.id}
-                  className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
+                  className={`flex ${isOwn ? 'justify-end' : 'justify-start'} group`}
                 >
                   <div className={`flex space-x-2 max-w-xs lg:max-w-md ${isOwn ? 'flex-row-reverse space-x-reverse' : ''}`}>
                     <Avatar className="w-8 h-8">
@@ -294,15 +331,24 @@ const Chat = () => {
                         {message.profiles?.username?.charAt(0)?.toUpperCase() || 'U'}
                       </AvatarFallback>
                     </Avatar>
-                    <div>
+                    <div className="flex-1">
                       <div
-                        className={`px-3 py-2 rounded-lg ${
+                        className={`px-3 py-2 rounded-lg relative ${
                           isOwn
                             ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
                             : 'bg-white shadow-sm border'
                         }`}
                       >
                         <p className="text-sm">{message.content}</p>
+                        {isOwn && (
+                          <div className="absolute -top-2 -right-2">
+                            <MessageActions 
+                              messageId={message.id} 
+                              isOwn={isOwn} 
+                              onMessageDeleted={handleMessageDeleted}
+                            />
+                          </div>
+                        )}
                       </div>
                       <div className={`text-xs text-gray-500 mt-1 ${isOwn ? 'text-right' : ''}`}>
                         <span className="font-medium">{message.profiles?.username || 'Unknown'}</span>
