@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
@@ -18,7 +17,7 @@ type Message = {
   profiles?: {
     username: string
     avatar_url: string | null
-  }
+  } | null
 }
 
 type Room = {
@@ -83,7 +82,7 @@ const Chat = () => {
         .from('messages')
         .select(`
           *,
-          profiles:sender_id (
+          profiles!messages_sender_id_fkey (
             username,
             avatar_url
           )
@@ -115,7 +114,7 @@ const Chat = () => {
             .from('messages')
             .select(`
               *,
-              profiles:sender_id (
+              profiles!messages_sender_id_fkey (
                 username,
                 avatar_url
               )
@@ -282,7 +281,7 @@ const Chat = () => {
                         <p className="text-sm">{message.content}</p>
                       </div>
                       <div className={`text-xs text-gray-500 mt-1 ${isOwn ? 'text-right' : ''}`}>
-                        <span className="font-medium">{message.profiles?.username}</span>
+                        <span className="font-medium">{message.profiles?.username || 'Unknown'}</span>
                         <span className="ml-2">
                           {new Date(message.created_at).toLocaleTimeString()}
                         </span>
