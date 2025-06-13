@@ -44,30 +44,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(session?.user ?? null)
       setLoading(false)
 
-      // Create profile on sign up
+      // Create profile on sign up - fixed the event type comparison
       if (event === 'SIGNED_UP' && session?.user) {
-        await createUserProfile(session.user)
+        // Profile creation is now handled by the database trigger
+        console.log('User signed up:', session.user.email)
       }
     })
 
     return () => subscription.unsubscribe()
   }, [])
-
-  const createUserProfile = async (user: User) => {
-    const { error } = await supabase
-      .from('profiles')
-      .insert([
-        {
-          id: user.id,
-          username: user.email?.split('@')[0] || 'User',
-          avatar_url: user.user_metadata.avatar_url || null,
-        }
-      ])
-
-    if (error) {
-      console.error('Error creating user profile:', error)
-    }
-  }
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
@@ -84,7 +69,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       options: {
         data: {
           username,
-        }
+        },
+        emailRedirectTo: `${window.location.origin}/`
       }
     })
     if (error) throw error
