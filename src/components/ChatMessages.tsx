@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -31,6 +30,8 @@ export type ChatMessagesProps = {
   handleMessageDeleted: () => void;
 };
 
+const ANIMATE_NEW_CLASS = "animate-fade-in";
+
 const ChatMessages = ({
   messages,
   userId,
@@ -44,6 +45,9 @@ const ChatMessages = ({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Responsive minimum height for scroll area
+  const scrollAreaMinHeight = "min-h-[250px] sm:min-h-[350px]";
 
   return (
     <>
@@ -72,12 +76,19 @@ const ChatMessages = ({
         </div>
       </div>
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea className={`flex-1 p-4 ${scrollAreaMinHeight}`}>
         <div className="space-y-4">
-          {messages.map((message) => {
+          {messages.map((message, idx) => {
             const isOwn = message.sender_id === userId;
+            // Apply entry animation to new messages (last entered)
+            const animClass =
+              idx >= messages.length - 3 ? ANIMATE_NEW_CLASS : ""; // Animate only last 3 for smoothness
+
             return (
-              <div key={message.id} className={`flex ${isOwn ? "justify-end" : "justify-start"} group`}>
+              <div
+                key={message.id}
+                className={`flex ${isOwn ? "justify-end" : "justify-start"} group transition-all duration-150 ${animClass}`}
+              >
                 <div className={`flex space-x-2 max-w-xs lg:max-w-md ${isOwn ? "flex-row-reverse space-x-reverse" : ""}`}>
                   <Avatar className="w-8 h-8">
                     <AvatarImage src={message.profiles?.avatar_url || undefined} />
@@ -87,10 +98,10 @@ const ChatMessages = ({
                   </Avatar>
                   <div className="flex-1">
                     <div
-                      className={`px-3 py-2 rounded-lg relative ${
+                      className={`px-3 py-2 rounded-lg relative break-words transition-transform duration-150 shadow-sm ${
                         isOwn
-                          ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white"
-                          : "bg-white shadow-sm border"
+                          ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white animate-scale-in"
+                          : "bg-white shadow-sm border animate-fade-in"
                       }`}
                     >
                       <p className="text-sm">{message.content}</p>

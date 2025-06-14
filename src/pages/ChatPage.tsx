@@ -6,6 +6,9 @@ import ChatSidebar from "@/components/ChatSidebar";
 import ChatMessages from "@/components/ChatMessages";
 import ChatInput from "@/components/ChatInput";
 import { MessageCircle } from 'lucide-react'
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Menu } from "lucide-react";
+import { useState as useReactState } from "react";
 
 type Message = {
   id: string;
@@ -32,6 +35,15 @@ const ChatPage = () => {
   const [currentRoom, setCurrentRoom] = useState("");
   const [loading, setLoading] = useState(true);
   const channelRef = useRef<any>(null);
+
+  // UI STATE for sidebar visibility on small screens
+  const isMobile = useIsMobile();
+  const [sidebarOpen, setSidebarOpen] = useReactState(!isMobile);
+
+  // Responsive sidebar effect
+  useEffect(() => {
+    setSidebarOpen(!isMobile);
+  }, [isMobile, currentRoom]);
 
   useEffect(() => {
     fetchRooms();
@@ -281,7 +293,7 @@ const ChatPage = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50">
-        <div className="text-center">
+        <div className="text-center animate-fade-in">
           <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
             <div className="w-8 h-8 bg-white rounded-full"></div>
           </div>
@@ -292,18 +304,63 @@ const ChatPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex">
-      <ChatSidebar
-        user={user}
-        rooms={rooms}
-        currentRoom={currentRoom}
-        setCurrentRoom={setCurrentRoom}
-        handleSignOut={handleSignOut}
-        fetchRooms={fetchRooms}
-        handleRoomDeleted={handleRoomDeleted}
-        generateRoomAvatar={generateRoomAvatar}
-      />
-      <div className="flex-1 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex w-full transition-colors duration-700">
+      {/* Mobile sidebar and toggle button */}
+      {isMobile && (
+        <>
+          <button
+            className="fixed z-30 top-4 left-4 bg-white shadow-lg p-2 rounded-full flex items-center justify-center transition-transform duration-200 hover:scale-110 focus-visible:ring-2 focus-visible:ring-blue-500"
+            aria-label="Open sidebar"
+            onClick={() => setSidebarOpen(true)}
+            style={{ display: sidebarOpen ? "none" : "flex" }}
+          >
+            <Menu className="text-blue-600" />
+          </button>
+          {/* Sidebar overlay */}
+          <div
+            className={`fixed inset-0 bg-black/30 z-20 backdrop-blur-sm transition-opacity duration-200 ${sidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
+            onClick={() => setSidebarOpen(false)}
+          />
+        </>
+      )}
+
+      {/* Sidebar (animates on mobile) */}
+      <div
+        className={`
+          z-30
+          ${isMobile
+            ? `fixed top-0 left-0 h-full transition-transform duration-300 bg-white/90 backdrop-blur-lg 
+                shadow-xl w-64
+                ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+                `
+            : "relative w-80"}
+          animate-fade-in
+        `}
+        style={isMobile ? { minHeight: "100vh" } : undefined}
+      >
+        <ChatSidebar
+          user={user}
+          rooms={rooms}
+          currentRoom={currentRoom}
+          setCurrentRoom={(id) => {
+            setCurrentRoom(id);
+            setSidebarOpen(false); // auto close drawer on mobile
+          }}
+          handleSignOut={handleSignOut}
+          fetchRooms={fetchRooms}
+          handleRoomDeleted={handleRoomDeleted}
+          generateRoomAvatar={generateRoomAvatar}
+          isMobile={isMobile}
+          closeSidebar={() => setSidebarOpen(false)}
+        />
+      </div>
+      {/* Main content region */}
+      <div
+        className={`
+          flex-1 flex flex-col min-h-screen transition-all duration-500
+          ${isMobile && sidebarOpen ? "pointer-events-none blur-sm scale-95" : ""}
+        `}
+      >
         <ChatMessages
           messages={messages}
           userId={user?.id}

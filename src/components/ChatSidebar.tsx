@@ -1,7 +1,7 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { LogOut, MessageCircle, Users } from "lucide-react";
+import { LogOut, MessageCircle, Users, X } from "lucide-react";
 import CreateRoomDialog from "@/components/CreateRoomDialog";
 import RoomActions from "@/components/RoomActions";
 
@@ -20,6 +20,8 @@ export type ChatSidebarProps = {
   fetchRooms: () => void;
   handleRoomDeleted: () => void;
   generateRoomAvatar: (name: string) => string;
+  isMobile?: boolean;
+  closeSidebar?: () => void;
 };
 
 const ChatSidebar = ({
@@ -31,14 +33,29 @@ const ChatSidebar = ({
   fetchRooms,
   handleRoomDeleted,
   generateRoomAvatar,
+  isMobile = false,
+  closeSidebar
 }: ChatSidebarProps) => {
   return (
-    <div className="w-80 bg-white/80 backdrop-blur-sm border-r border-gray-200 flex flex-col">
+    <div className={`w-full h-full shadow-md 
+      bg-white/90 backdrop-blur-lg transition-all duration-300 
+      flex flex-col ${isMobile ? "relative" : ""} animate-slide-in-right`}>
+
+      {/* mobile close button */}
+      {isMobile && (
+        <button
+          onClick={closeSidebar}
+          className="absolute top-4 right-4 z-40 bg-gray-100 hover:bg-gray-200 p-2 rounded-full border border-gray-200 shadow transition-transform duration-150 hover:scale-110"
+          aria-label="Close sidebar"
+        >
+          <X className="text-gray-500" />
+        </button>
+      )}
       {/* Header */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-4 border-b border-gray-200 bg-white/70 flex-shrink-0 animate-fade-in">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center animate-scale-in">
               <MessageCircle className="h-5 w-5 text-white" />
             </div>
             <div>
@@ -57,11 +74,11 @@ const ChatSidebar = ({
         </div>
       </div>
       {/* Rooms List */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-y-auto">
         <div className="p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center space-x-2">
-              <Users className="h-4 w-4 text-gray-500" />
+              <Users className="h-4 w-4 text-gray-500 animate-fade-in" />
               <span className="text-sm font-medium text-gray-700">Rooms</span>
             </div>
           </div>
@@ -70,11 +87,11 @@ const ChatSidebar = ({
             {rooms.map((room) => (
               <div
                 key={room.id}
-                className={`group flex items-center justify-between p-3 rounded-lg transition-colors ${
+                className={`group flex items-center justify-between p-3 rounded-lg transition-colors duration-100 ${
                   currentRoom === room.id
-                    ? "bg-blue-100 text-blue-700"
+                    ? "bg-blue-100 text-blue-700 shadow"
                     : "hover:bg-gray-100 text-gray-700"
-                }`}
+                } animate-fade-in`}
               >
                 <button
                   onClick={() => setCurrentRoom(room.id)}
@@ -83,7 +100,7 @@ const ChatSidebar = ({
                   <div
                     className={`w-8 h-8 bg-gradient-to-r ${generateRoomAvatar(
                       room.name
-                    )} rounded-full flex items-center justify-center`}
+                    )} rounded-full flex items-center justify-center animate-scale-in`}
                   >
                     <span className="text-white font-medium text-sm">
                       {room.name.charAt(0).toUpperCase()}
