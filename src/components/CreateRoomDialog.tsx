@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
+import { useAuth } from '@/contexts/AuthContext'
 
 type CreateRoomDialogProps = {
   onRoomCreated: () => void
@@ -15,16 +16,17 @@ const CreateRoomDialog = ({ onRoomCreated }: CreateRoomDialogProps) => {
   const [roomName, setRoomName] = useState('')
   const [isOpen, setIsOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
+  const { user } = useAuth();
 
   const handleCreateRoom = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!roomName.trim()) return
+    if (!roomName.trim() || !user) return
 
     setIsCreating(true)
     try {
       const { error } = await supabase
         .from('rooms')
-        .insert([{ name: roomName.trim() }])
+        .insert([{ name: roomName.trim(), created_by: user.id }])  // << set created_by
 
       if (error) throw error
 

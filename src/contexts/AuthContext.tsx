@@ -105,7 +105,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }
 
-  // NEW: Accept a router navigate function for client navigation
+  // Fix TS error: Only one arg for navigate
   const signOut = async (navigate?: (path: string) => void) => {
     cleanupAuthState()
     try {
@@ -114,7 +114,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     cleanupAuthState()
     // If a navigate function is passed, use it. Otherwise, fallback to hard redirect (for non-router contexts)
     if (navigate) {
-      navigate("/auth", { replace: true });
+      // Only pass string path, since v6 takes only that for useNavigate()
+      navigate("/auth");
     } else {
       window.location.href = '/auth';
     }

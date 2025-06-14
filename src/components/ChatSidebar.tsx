@@ -9,6 +9,7 @@ type Room = {
   id: string;
   name: string;
   created_at: string;
+  created_by?: string | null;
 };
 
 export type ChatSidebarProps = {
@@ -117,6 +118,7 @@ const ChatSidebar = ({
                   roomId={room.id}
                   roomName={room.name}
                   onRoomDeleted={handleRoomDeleted}
+                  canDelete={user?.id && room.created_by === user.id}
                 />
               </div>
             ))}

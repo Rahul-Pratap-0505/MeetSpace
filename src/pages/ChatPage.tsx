@@ -32,6 +32,7 @@ type Room = {
   id: string;
   name: string;
   created_at: string;
+  created_by?: string | null;
 };
 
 const ChatPage = () => {
@@ -68,7 +69,7 @@ const ChatPage = () => {
 
       if (error) throw error;
 
-      setRooms(data || []);
+      setRooms((data || []) as Room[]);
       if (data && data.length > 0 && !currentRoom) {
         setCurrentRoom(data[0].id);
       }

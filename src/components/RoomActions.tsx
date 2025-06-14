@@ -10,9 +10,10 @@ type RoomActionsProps = {
   roomId: string
   roomName: string
   onRoomDeleted: () => void
+  canDelete?: boolean
 }
 
-const RoomActions = ({ roomId, roomName, onRoomDeleted }: RoomActionsProps) => {
+const RoomActions = ({ roomId, roomName, onRoomDeleted, canDelete = true }: RoomActionsProps) => {
   const handleDeleteRoom = async () => {
     try {
       // First delete all messages in the room
@@ -37,6 +38,8 @@ const RoomActions = ({ roomId, roomName, onRoomDeleted }: RoomActionsProps) => {
       toast.error('Error deleting room: ' + error.message)
     }
   }
+
+  if (!canDelete) return null;
 
   return (
     <DropdownMenu>
