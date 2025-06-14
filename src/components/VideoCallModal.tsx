@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -124,38 +123,7 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
           </Button>
         </div>
         <div className="flex flex-col items-center justify-center p-3 gap-3 bg-gray-50 transition-all">
-          {/* Show local camera preview on open, before Join */}
-          {callStatus === "" && previewActive && (
-            <div className="flex flex-col items-center gap-3 mt-3">
-              <div className="w-52 h-40 bg-gray-200 rounded-lg shadow flex items-center justify-center overflow-hidden ring-2 ring-blue-300 relative mb-2">
-                <video
-                  ref={localVideoRef}
-                  autoPlay
-                  muted
-                  playsInline
-                  className="w-full h-full object-cover"
-                  style={{ background: "#ccc" }}
-                />
-                <span className="absolute bottom-1 left-1 bg-black bg-opacity-30 px-2 rounded text-xs text-white">
-                  You (Preview)
-                </span>
-              </div>
-              <Video className="h-10 w-10 text-blue-600 mb-2 animate-pulse" />
-              <div className="text-lg font-medium text-gray-700">
-                Ready to join the group video call?
-              </div>
-              <Button
-                onClick={handleAccept}
-                className="bg-blue-600 text-white hover:bg-blue-700"
-                disabled={mediaLoading}
-              >
-                {mediaLoading ? "Connecting..." : "Join Call"}
-              </Button>
-              <div className="text-xs text-gray-400">
-                You will be prompted to grant camera/mic access after joining.
-              </div>
-            </div>
-          )}
+          {/* Only show video call renderer when connecting or connected */}
           {(callStatus === "connected" || callStatus === "connecting") && ready && (
             <VideoCallRenderer
               callStatus={callStatus}
