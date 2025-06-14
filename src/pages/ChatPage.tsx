@@ -13,6 +13,7 @@ import { useChatMessages } from "@/hooks/useChatMessages";
 import { useChatPresence } from "@/hooks/useChatPresence";
 import VideoCallModal from "@/components/VideoCallModal";
 import VideoCallButton from "@/components/VideoCallButton";
+import { useNavigate } from "react-router-dom";
 
 type Message = {
   id: string;
@@ -46,6 +47,8 @@ const ChatPage = () => {
 
   // NEW: Track a local loading state for room switch UX
   const [roomLoading, setRoomLoading] = useState(false);
+
+  const navigate = useNavigate();
 
   useEffect(() => {
     setSidebarOpen(!isMobile);
@@ -102,8 +105,9 @@ const ChatPage = () => {
 
   const handleSignOut = async () => {
     try {
-      await signOut();
-      toast.success("Signed out successfully");
+      // Pass the navigate function to ensure client-side navigation after logout
+      await signOut(navigate);
+      // toast and state updates are handled after navigation
     } catch (error: any) {
       toast.error("Error signing out: " + error.message);
     }

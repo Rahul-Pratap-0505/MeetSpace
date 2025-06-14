@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react'
 import { User, AuthChangeEvent } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
+import { useNavigate } from "react-router-dom";
 
 type AuthContextType = {
   user: User | null
@@ -9,7 +10,7 @@ type AuthContextType = {
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string, username: string) => Promise<void>
   signInWithGoogle: () => Promise<void>
-  signOut: () => Promise<void>
+  signOut: (navigate?: (path: string) => void) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -104,15 +105,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }
 
-  const signOut = async () => {
+  // NEW: Accept a router navigate function for client navigation
+  const signOut = async (navigate?: (path: string) => void) => {
     cleanupAuthState()
-    // Try global sign out, but ignore errors (in case no session)
     try {
       await supabase.auth.signOut({ scope: 'global' } as any)
     } catch (e) {}
     cleanupAuthState()
-    // Redirect to /auth for a clean state
-    window.location.href = '/auth'
+    // If a navigate function is passed, use it. Otherwise, fallback to hard redirect (for non-router contexts)
+    if (navigate) {
+      navigate("/auth", { replace: true });
+    } else {
+      window.location.href = '/auth';
+    }
   }
 
   return (
