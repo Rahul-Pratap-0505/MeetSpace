@@ -93,13 +93,41 @@ const ChatPage = () => {
 
       if (profilesError) throw profilesError;
 
-      const messagesWithProfiles =
+      let messagesWithProfiles =
         messagesData?.map((message) => ({
           ...message,
           profiles: profilesData?.find((profile) => profile.id === message.sender_id) || null,
         })) || [];
 
-      setMessages(messagesWithProfiles);
+      // --- FIX: keep optimistic messages UNTIL replaced by real ones ---
+      setMessages((prev) => {
+        // gather any optimistic messages present in state
+        const optimistic = prev.filter((msg) => msg.id.startsWith("optimistic"));
+        // replace optimistic messages with real ones if present; else keep
+        let updated = [...messagesWithProfiles];
+
+        // Attempt to replace or add optimistic if not found among server messages
+        optimistic.forEach((optimisticMsg) => {
+          const matchIdx = updated.findIndex(
+            (m) =>
+              m.sender_id === optimisticMsg.sender_id &&
+              m.content === optimisticMsg.content
+          );
+          if (matchIdx === -1) {
+            // Server has not sent this message yet (possibly network lag); keep optimistic
+            updated.push(optimisticMsg);
+            console.log("Preserving optimistic message on reload:", optimisticMsg);
+          } else {
+            // Matched; do nothing, server message replaces optimistic
+            console.log("Optimistic message matched with real message:", optimisticMsg);
+          }
+        });
+
+        // Re-sort to preserve time order (if necessary)
+        updated.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+        return updated;
+      });
     } catch (error: any) {
       toast.error("Error fetching messages: " + error.message);
     }
