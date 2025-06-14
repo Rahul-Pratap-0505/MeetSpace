@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,19 +9,27 @@ import { useParams } from "react-router-dom";
 
 type ChatInputProps = {
   sendMessage: (text: string, resetInput: () => void) => void;
-  presentUsers: string[]; // NEW PROP for video call modal
+  presentUsers: string[];
 };
 
 const ChatInput = ({ sendMessage, presentUsers }: ChatInputProps) => {
   const [input, setInput] = useState("");
   const [videoModal, setVideoModal] = useState(false);
-  const [startCall, setStartCall] = useState(false); // Track explicit call start
-  const videoCallModalRef = useRef<{ inviteUsers: () => void } | null>(null);
-  // Use AuthContext for user and current room
+  const [callSession, setCallSession] = useState<Date | null>(null); // Track call session to force modal open
   const { user } = useAuth();
   const params = useParams();
-  // fallback to a prop/passed roomId if needed
   const roomId = params?.roomId || "";
+
+  // New: Open modal for a new call session
+  const handleStartVideoCall = () => {
+    setCallSession(new Date()); // unique session key per call
+    setVideoModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setVideoModal(false);
+    setCallSession(null);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,9 +53,7 @@ const ChatInput = ({ sendMessage, presentUsers }: ChatInputProps) => {
         <Button
           type="button"
           variant="outline"
-          onClick={() => {
-            setVideoModal(true);
-          }}
+          onClick={handleStartVideoCall}
           className={`
             flex justify-center items-center
             border bg-gradient-to-r from-blue-200 to-purple-200
@@ -72,18 +79,13 @@ const ChatInput = ({ sendMessage, presentUsers }: ChatInputProps) => {
           <Send className="h-4 w-4" />
         </Button>
       </form>
-      {/* Only start the call when user confirms */}
       <VideoCallModal
-        open={videoModal}
-        onClose={() => {
-          setVideoModal(false);
-          setStartCall(false);
-        }}
+        open={!!videoModal}
+        onClose={handleCloseModal}
         roomId={roomId || ""}
         userId={user?.id || ""}
-        allowMediaAccess={startCall}
-        onStartCall={() => setStartCall(true)}
-        presentUsers={presentUsers} // <-- Pass present users
+        presentUsers={presentUsers}
+        callSession={callSession?.toISOString() ?? ""}
       />
     </div>
   );

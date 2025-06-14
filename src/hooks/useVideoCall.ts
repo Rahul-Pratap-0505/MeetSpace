@@ -154,6 +154,9 @@ export const useVideoCall = ({
       mediaStream.getTracks().forEach((t) => t.stop());
     }
     setMediaStream(null);
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = null;
+    }
     if (callChannelRef.current) {
       supabase.removeChannel(callChannelRef.current);
       callChannelRef.current = null;
@@ -163,7 +166,7 @@ export const useVideoCall = ({
     setCallStatus(manual ? "" : "ended");
     setMediaLoading(false);
     console.log("Cleaned up call state");
-  }, [mediaStream, manual]);
+  }, [mediaStream, manual, localVideoRef]);
 
   // --- Media setup ---
   const startLocalMedia = useCallback(async () => {
