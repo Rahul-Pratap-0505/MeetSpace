@@ -31,12 +31,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event: AuthChangeEvent, session) => {
+      async (event, session) => {
         console.log('Auth event:', event)
         setUser(session?.user ?? null)
         setLoading(false)
         
-        // Handle sign up event to create profile
+        // Correct type check for SIGNED_UP event
         if (event === 'SIGNED_UP' && session?.user) {
           // Profile creation is handled by the database trigger
           console.log('User signed up, profile will be created automatically')

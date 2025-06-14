@@ -43,6 +43,7 @@ const Chat = () => {
     fetchRooms()
   }, [])
 
+  // Make sure to refresh messages after room creation or switch
   useEffect(() => {
     if (currentRoom) {
       fetchMessages()
