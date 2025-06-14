@@ -25,6 +25,8 @@ export type ChatSidebarProps = {
   closeSidebar?: () => void;
 };
 
+const SUPERADMIN_EMAIL = "rahulsingh5may@gmail.com";
+
 const ChatSidebar = ({
   user,
   rooms,
@@ -118,7 +120,13 @@ const ChatSidebar = ({
                   roomId={room.id}
                   roomName={room.name}
                   onRoomDeleted={handleRoomDeleted}
-                  canDelete={user?.id && room.created_by === user.id}
+                  // Show delete for room owner OR for superadmin
+                  canDelete={
+                    user?.id && (
+                      room.created_by === user.id ||
+                      user.email === SUPERADMIN_EMAIL
+                    )
+                  }
                 />
               </div>
             ))}
@@ -130,3 +138,4 @@ const ChatSidebar = ({
 };
 
 export default ChatSidebar;
+
