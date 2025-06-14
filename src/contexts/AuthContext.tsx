@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { User, AuthChangeEvent } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
@@ -13,6 +14,25 @@ type AuthContextType = {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+// Utility to robustly cleanup Supabase auth client state
+const cleanupAuthState = () => {
+  try {
+    // Remove all supabase and sb- keys from localStorage and sessionStorage
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+        localStorage.removeItem(key)
+      }
+    })
+    Object.keys(sessionStorage).forEach((key) => {
+      if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+        sessionStorage.removeItem(key)
+      }
+    })
+  } catch (e) {
+    // noop
+  }
+}
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null)
@@ -30,13 +50,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event: AuthChangeEvent, session) => {
         console.log('Auth event:', event)
         setUser(session?.user ?? null)
         setLoading(false)
         
-        // Fix TS error: event is AuthChangeEvent (a string union type)
-        if (event === "SIGNED_UP" && session?.user) {
+        if (event === 'SIGNED_UP' && session?.user) {
           // Profile creation is handled by the database trigger
           console.log('User signed up, profile will be created automatically')
         }
@@ -47,6 +66,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [])
 
   const signIn = async (email: string, password: string) => {
+    cleanupAuthState() // Clean state before signing in
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -57,6 +77,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }
 
   const signUp = async (email: string, password: string, username: string) => {
+    cleanupAuthState() // Clean state before signing up
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -72,6 +93,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }
 
   const signInWithGoogle = async () => {
+    cleanupAuthState() // Clean state before signing in
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -84,10 +106,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut()
-    if (error) {
-      throw error
-    }
+    cleanupAuthState()
+    // Try global sign out, but ignore errors (in case no session)
+    try {
+      await supabase.auth.signOut({ scope: 'global' } as any)
+    } catch (e) {}
+    cleanupAuthState()
+    // Redirect to /auth for a clean state
+    window.location.href = '/auth'
   }
 
   return (
