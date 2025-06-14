@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,8 +27,6 @@ const ChatInput = ({
   onTypingStop,
 }: ChatInputProps) => {
   const [input, setInput] = useState("");
-  const [videoModal, setVideoModal] = useState(false);
-  const [callSession, setCallSession] = useState<Date | null>(null);
   const { user } = useAuth();
   const params = useParams();
   const roomId = params?.roomId || "";
@@ -41,16 +38,6 @@ const ChatInput = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const handleStartVideoCall = () => {
-    setCallSession(new Date());
-    setVideoModal(true);
-  };
-
-  const handleCloseModal = () => {
-    setVideoModal(false);
-    setCallSession(null);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,24 +130,6 @@ const ChatInput = ({
           disabled={uploading}
         />
         <Button
-          type="button"
-          variant="outline"
-          onClick={handleStartVideoCall}
-          className={`
-            flex justify-center items-center
-            border bg-gradient-to-r from-blue-200 to-purple-200
-            hover:from-blue-300 hover:to-purple-300
-            shadow-sm
-            transition-all duration-200
-            dark:bg-muted/70 dark:border-muted dark:text-foreground
-            hover:dark:bg-muted/80
-          `}
-          aria-label="Start Video Call"
-          disabled={uploading}
-        >
-          <Video className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-        </Button>
-        <Button
           type="submit"
           disabled={(!input.trim() && !selectedFile) || uploading}
           className={`
@@ -192,15 +161,6 @@ const ChatInput = ({
           </Button>
         </div>
       )}
-
-      <VideoCallModal
-        open={!!videoModal}
-        onClose={handleCloseModal}
-        roomId={roomId || ""}
-        userId={user?.id || ""}
-        presentUsers={presentUsers}
-        callSession={callSession?.toISOString() ?? ""}
-      />
     </div>
   );
 };
