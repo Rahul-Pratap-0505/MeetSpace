@@ -45,10 +45,12 @@ const CreateRoomDialog = ({ onRoomCreated }: CreateRoomDialogProps) => {
         <Button 
           variant="ghost" 
           size="sm" 
-          className="w-full justify-start text-foreground dark:text-foreground"
+          className="w-full justify-start"
         >
           <Plus className="h-4 w-4 mr-2" />
-          Create Room
+          <span className="text-foreground dark:text-foreground">
+            Create Room
+          </span>
         </Button>
       </DialogTrigger>
       <DialogContent>
