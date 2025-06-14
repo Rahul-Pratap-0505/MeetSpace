@@ -132,7 +132,25 @@ const ChatPage = () => {
             profiles: profileData,
           } as Message;
 
-          setMessages((prev) => [...prev, newMessage]);
+          setMessages((prev) => {
+            // Remove any optimistic message that matches this real message by content/sender/time delta
+            const optimisticIdx = prev.findIndex(
+              (msg) =>
+                msg.sender_id === newMessage.sender_id &&
+                msg.content === newMessage.content &&
+                msg.id.startsWith("optimistic")
+            );
+            if (optimisticIdx !== -1) {
+              // Replace the optimistic entry with the new one at the same position
+              return [
+                ...prev.slice(0, optimisticIdx),
+                newMessage,
+                ...prev.slice(optimisticIdx + 1),
+              ];
+            } else {
+              return [...prev, newMessage];
+            }
+          });
         }
       )
       .on(
@@ -182,9 +200,8 @@ const ChatPage = () => {
       ]);
       if (error) throw error;
 
-      setTimeout(() => {
-        setMessages((prev) => prev.filter((msg) => msg.id !== optimisticId));
-      }, 3000);
+      // No longer remove the optimistic message by timeout;
+      // the realtime "INSERT" event will replace it instead.
 
       if (messages.length === 0) fetchMessages();
     } catch (error: any) {
