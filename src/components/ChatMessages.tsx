@@ -1,0 +1,123 @@
+
+import React, { useRef, useEffect } from "react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import MessageActions from "@/components/MessageActions";
+
+type Message = {
+  id: string;
+  sender_id: string;
+  content: string;
+  created_at: string;
+  room_id: string;
+  profiles?: {
+    username: string;
+    avatar_url: string | null;
+  } | null;
+};
+
+type Room = {
+  id: string;
+  name: string;
+  created_at: string;
+};
+
+export type ChatMessagesProps = {
+  messages: Message[];
+  userId: string | undefined;
+  rooms: Room[];
+  currentRoom: string;
+  generateRoomAvatar: (name: string) => string;
+  handleMessageDeleted: () => void;
+};
+
+const ChatMessages = ({
+  messages,
+  userId,
+  rooms,
+  currentRoom,
+  generateRoomAvatar,
+  handleMessageDeleted
+}: ChatMessagesProps) => {
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  return (
+    <>
+      {/* Chat Header */}
+      <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200 p-4">
+        <div className="flex items-center space-x-3">
+          {!!currentRoom && (
+            <>
+              <div
+                className={`w-10 h-10 bg-gradient-to-r ${generateRoomAvatar(
+                  rooms.find((r) => r.id === currentRoom)?.name || ""
+                )} rounded-full flex items-center justify-center`}
+              >
+                <span className="text-white font-medium">
+                  {rooms.find((r) => r.id === currentRoom)?.name?.charAt(0) || "R"}
+                </span>
+              </div>
+              <div>
+                <h2 className="font-semibold text-gray-900">
+                  {rooms.find((r) => r.id === currentRoom)?.name || "Select a room"}
+                </h2>
+                <p className="text-sm text-gray-500">{messages.length} messages</p>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+      {/* Messages */}
+      <ScrollArea className="flex-1 p-4">
+        <div className="space-y-4">
+          {messages.map((message) => {
+            const isOwn = message.sender_id === userId;
+            return (
+              <div key={message.id} className={`flex ${isOwn ? "justify-end" : "justify-start"} group`}>
+                <div className={`flex space-x-2 max-w-xs lg:max-w-md ${isOwn ? "flex-row-reverse space-x-reverse" : ""}`}>
+                  <Avatar className="w-8 h-8">
+                    <AvatarImage src={message.profiles?.avatar_url || undefined} />
+                    <AvatarFallback className="bg-gradient-to-r from-blue-400 to-purple-500 text-white text-xs">
+                      {message.profiles?.username?.charAt(0)?.toUpperCase() || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <div
+                      className={`px-3 py-2 rounded-lg relative ${
+                        isOwn
+                          ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white"
+                          : "bg-white shadow-sm border"
+                      }`}
+                    >
+                      <p className="text-sm">{message.content}</p>
+                      {isOwn && (
+                        <div className="absolute -top-2 -right-2">
+                          <MessageActions
+                            messageId={message.id}
+                            isOwn={isOwn}
+                            onMessageDeleted={handleMessageDeleted}
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <div className={`text-xs text-gray-500 mt-1 ${isOwn ? "text-right" : ""}`}>
+                      <span className="font-medium">{message.profiles?.username || "Unknown"}</span>
+                      <span className="ml-2">{new Date(message.created_at).toLocaleTimeString()}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          <div ref={messagesEndRef} />
+        </div>
+      </ScrollArea>
+    </>
+  );
+};
+
+export default ChatMessages;
