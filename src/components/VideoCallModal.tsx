@@ -26,7 +26,10 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const [showPrompt, setShowPrompt] = useState(false);
-  const [previewStarted, setPreviewStarted] = useState(false);
+
+  // New: Always start preview when modal opens, and cleanup when closes
+  const [previewActive, setPreviewActive] = useState(false);
+
   const {
     callStatus,
     inviteUsers,
@@ -48,30 +51,33 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
     manual: true,
   });
 
-  // Only show modal when there is a new call
+  // Show modal for new call session
   useEffect(() => {
-    if (callSession) {
-      setShowPrompt(true);
-    } else {
-      setShowPrompt(false);
-    }
+    setShowPrompt(!!callSession);
     setError(null);
-    // Start local camera preview as soon as modal opens (not joined)
-    if (open && !previewStarted && !ready) {
-      startLocalPreview && startLocalPreview();
-      setPreviewStarted(true);
-    }
-    if (!open && previewStarted) {
-      stopLocalPreview && stopLocalPreview();
-      setPreviewStarted(false);
-    }
-    // eslint-disable-next-line
   }, [callSession, roomId, open]);
 
-  // Helper: is user present in the room now?
+  // Always open preview camera on modal open, except when connected (already in call)
+  useEffect(() => {
+    if (open && showPrompt && callStatus !== "connected") {
+      if (!previewActive) {
+        startLocalPreview && startLocalPreview();
+        setPreviewActive(true);
+      }
+    } else {
+      // If modal closes or user joins the call, stop preview
+      if (previewActive) {
+        stopLocalPreview && stopLocalPreview();
+        setPreviewActive(false);
+      }
+    }
+    // eslint-disable-next-line
+  }, [open, showPrompt, callStatus]);
+
+  // Is user present in room?
   const isUserPresent = presentUsers?.includes?.(userId);
 
-  // Accept: join call with media/signaling
+  // Accept/join: join call with media/signaling
   const handleAccept = async () => {
     await initializeMediaAndSignaling();
     await acceptCall();
@@ -81,7 +87,7 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
   const handleDeclineOrCut = () => {
     setShowPrompt(false);
     cleanup();
-    setPreviewStarted(false);
+    setPreviewActive(false);
     onClose();
   };
 
@@ -105,8 +111,8 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
           </Button>
         </div>
         <div className="flex flex-col items-center justify-center p-3 gap-3 bg-gray-50 transition-all">
-          {/* Always show local camera preview on open, before Join */}
-          {callStatus === "" && (
+          {/* Show local camera preview on open, before Join */}
+          {callStatus === "" && previewActive && (
             <div className="flex flex-col items-center gap-3 mt-3">
               <div className="w-52 h-40 bg-gray-200 rounded-lg shadow flex items-center justify-center overflow-hidden ring-2 ring-blue-300 relative mb-2">
                 <video
@@ -161,4 +167,3 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
 };
 
 export default VideoCallModal;
-
