@@ -40,7 +40,7 @@ const ChatPage = () => {
 
   useEffect(() => {
     setSidebarOpen(!isMobile);
-  }, [isMobile, currentRoom]);
+  }, [isMobile]); // Only depend on isMobile to fix flicker
 
   useEffect(() => {
     fetchRooms();
