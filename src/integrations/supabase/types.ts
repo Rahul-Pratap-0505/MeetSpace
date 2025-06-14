@@ -11,6 +11,7 @@ export type Database = {
     Tables: {
       messages: {
         Row: {
+          bucket_id: string
           content: string
           created_at: string
           file_type: string | null
@@ -20,6 +21,7 @@ export type Database = {
           sender_id: string
         }
         Insert: {
+          bucket_id?: string
           content: string
           created_at?: string
           file_type?: string | null
@@ -29,6 +31,7 @@ export type Database = {
           sender_id: string
         }
         Update: {
+          bucket_id?: string
           content?: string
           created_at?: string
           file_type?: string | null

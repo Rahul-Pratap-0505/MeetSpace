@@ -11,6 +11,8 @@ import { Menu } from "lucide-react";
 import { useState as useReactState } from "react";
 import { useChatMessages } from "@/hooks/useChatMessages";
 import { useChatPresence } from "@/hooks/useChatPresence";
+import VideoCallModal from "@/components/VideoCallModal";
+import VideoCallButton from "@/components/VideoCallButton";
 
 type Message = {
   id: string;
@@ -37,6 +39,10 @@ const ChatPage = () => {
   const [currentRoom, setCurrentRoom] = useState("");
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useReactState(!isMobile);
+
+  // Video call state
+  const [showCallModal, setShowCallModal] = useState(false);
+  const [callSession, setCallSession] = useState<string | null>(null);
 
   // NEW: Track a local loading state for room switch UX
   const [roomLoading, setRoomLoading] = useState(false);
@@ -148,6 +154,17 @@ const ChatPage = () => {
     );
   }
 
+  // Handle video call invite
+  const handleStartVideoCall = () => {
+    // User starts call - set session to now for sync
+    setCallSession(new Date().toISOString());
+    setShowCallModal(true);
+  };
+  const handleCloseVideoCall = () => {
+    setShowCallModal(false);
+    setCallSession(null);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex w-full transition-colors duration-700">
       {isMobile && (
@@ -202,6 +219,10 @@ const ChatPage = () => {
           ${isMobile && sidebarOpen ? "pointer-events-none blur-sm scale-95" : ""}
         `}
       >
+        {/* Video Call Button at top right */}
+        <div className="flex justify-end px-6 pt-6">
+          <VideoCallButton onStart={handleStartVideoCall} disabled={!currentRoom || !user} />
+        </div>
         <ChatMessages
           messages={messages}
           userId={user?.id}
@@ -219,6 +240,15 @@ const ChatPage = () => {
           onTypingStop={handleTypingStop}
         />
       </div>
+      {/* Modal for video call - only show if call session is set */}
+      <VideoCallModal
+        open={showCallModal}
+        onClose={handleCloseVideoCall}
+        roomId={currentRoom}
+        userId={user?.id}
+        presentUsers={presentUsers}
+        callSession={callSession}
+      />
     </div>
   );
 };
