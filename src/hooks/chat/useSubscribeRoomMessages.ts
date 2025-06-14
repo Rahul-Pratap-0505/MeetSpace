@@ -2,6 +2,18 @@
 import { useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 
+function isMessageObj(
+  msg: any
+): msg is { id: string; sender_id: string; content: string } {
+  return (
+    typeof msg === "object" &&
+    msg !== null &&
+    typeof msg.id === "string" &&
+    "sender_id" in msg &&
+    "content" in msg
+  );
+}
+
 export function useSubscribeRoomMessages(setMessages: any) {
   const channelRef = useRef<any>(null);
 
@@ -34,14 +46,9 @@ export function useSubscribeRoomMessages(setMessages: any) {
           };
 
           setMessages((prev: any[]) => {
-            // Fix: Filter for only objects that have the expected structure
             const optimisticIdx = prev.findIndex(
               (msg) =>
-                typeof msg === "object" &&
-                msg !== null &&
-                "sender_id" in msg &&
-                "content" in msg &&
-                typeof msg.id === "string" &&
+                isMessageObj(msg) &&
                 msg.sender_id === newMessage.sender_id &&
                 msg.content === newMessage.content &&
                 msg.id.startsWith("optimistic")
