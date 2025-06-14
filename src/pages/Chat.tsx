@@ -178,25 +178,53 @@ const Chat = () => {
     e.preventDefault()
     if (!newMessage.trim() || !currentRoom || !user) return
 
+    // --- Begin optimistic message logic ---
+    const optimisticId = `optimistic-${Date.now()}`
+    const optimisticMessage = {
+      id: optimisticId,
+      sender_id: user.id,
+      content: newMessage.trim(),
+      created_at: new Date().toISOString(),
+      room_id: currentRoom,
+      profiles: {
+        username: user.user_metadata.username || user.email || 'You',
+        avatar_url: null
+      }
+    }
+
+    // Optimistically add the message to UI
+    setMessages((prev) => [...prev, optimisticMessage])
+    setNewMessage('')
+
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('messages')
         .insert([
           {
-            content: newMessage.trim(),
+            content: optimisticMessage.content,
             sender_id: user.id,
             room_id: currentRoom,
           }
         ])
-
+        .select()
+      
       if (error) throw error
-      setNewMessage('')
 
-      // If there are no messages, fetch messages after sending
+      // Wait for the real-time event or refetch for the new message
+      // Remove the optimistic message if the real-time message not found immediately
+      setTimeout(() => {
+        setMessages((prev) =>
+          prev.filter((msg) => msg.id !== optimisticId)
+        )
+      }, 3000) // Remove optimistic after 3s if not replaced
+
+      // If no other messages present (i.e., first message in room), force fetch
       if (messages.length === 0) {
         fetchMessages()
       }
     } catch (error: any) {
+      // Remove the optimistic message on failure
+      setMessages((prev) => prev.filter((msg) => msg.id !== optimisticId))
       toast.error('Error sending message: ' + error.message)
     }
   }
