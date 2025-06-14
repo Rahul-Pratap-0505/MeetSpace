@@ -17,6 +17,20 @@ function isMessageObj(
 export function useSubscribeRoomMessages(setMessages: any) {
   const channelRef = useRef<any>(null);
 
+  // Helper: safely checks message shape for optimistic replacement
+  function isOptimisticMatch(msg: any, newMessage: any) {
+    return (
+      typeof msg === "object" &&
+      msg &&
+      typeof msg.id === "string" &&
+      msg.id.startsWith("optimistic") &&
+      "sender_id" in msg &&
+      "content" in msg &&
+      msg.sender_id === newMessage.sender_id &&
+      msg.content === newMessage.content
+    );
+  }
+
   const subscribeToMessages = useCallback((currentRoom: string) => {
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
@@ -34,6 +48,7 @@ export function useSubscribeRoomMessages(setMessages: any) {
           filter: `room_id=eq.${currentRoom}`,
         },
         async (payload) => {
+          // Fetch profile for sender
           const { data: profileData } = await supabase
             .from("profiles")
             .select("username, avatar_url")
@@ -46,12 +61,9 @@ export function useSubscribeRoomMessages(setMessages: any) {
           };
 
           setMessages((prev: any[]) => {
+            // Only run optimistic check for array entries that are real message objects
             const optimisticIdx = prev.findIndex(
-              (msg) =>
-                isMessageObj(msg) &&
-                msg.sender_id === newMessage.sender_id &&
-                msg.content === newMessage.content &&
-                msg.id.startsWith("optimistic")
+              (msg) => isOptimisticMatch(msg, newMessage)
             );
             if (optimisticIdx !== -1) {
               return [
@@ -84,3 +96,4 @@ export function useSubscribeRoomMessages(setMessages: any) {
 
   return subscribeToMessages;
 }
+
