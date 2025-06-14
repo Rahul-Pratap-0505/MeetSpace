@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,6 +8,8 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import Chat from "./pages/Chat";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import { ThemeProvider } from "next-themes";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 
 const queryClient = new QueryClient();
 
@@ -56,17 +57,22 @@ const AppRoutes = () => {
 };
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <AuthProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <ThemeProvider attribute="class" defaultTheme="system" enableSystem storageKey="talksphere-theme">
+    <div className="min-h-screen bg-background transition-colors duration-300">
+      <ThemeSwitcher />
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <AuthProvider>
+            <BrowserRouter>
+              <AppRoutes />
+            </BrowserRouter>
+          </AuthProvider>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </div>
+  </ThemeProvider>
 );
 
 export default App;

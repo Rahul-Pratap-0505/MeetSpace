@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
@@ -43,17 +42,18 @@ const Auth = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4">
-      <Card className="w-full max-w-md shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4 transition-colors dark:bg-gradient-to-br dark:from-[#1e2334] dark:via-[#10192c] dark:to-[#3a234b]">
+      <Card className="w-full max-w-md shadow-xl border-0 bg-white/80 transition-colors backdrop-blur-sm dark:bg-[#191b23]/80">
         <CardHeader className="text-center space-y-4">
           <div className="mx-auto w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
             <MessageCircle className="h-8 w-8 text-white" />
           </div>
           <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            {isLogin ? 'Welcome Back' : 'Create Account'}
+            {/* PROJECT NAME HERE */}
+            {isLogin ? 'Welcome Back to TalkSphere' : 'Create your TalkSphere account'}
           </CardTitle>
           <CardDescription>
-            {isLogin ? 'Sign in to continue chatting' : 'Join our chat community'}
+            {isLogin ? 'Sign in to continue chatting' : 'Join TalkSphere and start connecting'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
