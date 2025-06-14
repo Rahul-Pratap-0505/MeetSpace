@@ -8,9 +8,10 @@ import { useParams } from "react-router-dom";
 
 type ChatInputProps = {
   sendMessage: (text: string, resetInput: () => void) => void;
+  presentUsers: string[]; // NEW PROP for video call modal
 };
 
-const ChatInput = ({ sendMessage }: ChatInputProps) => {
+const ChatInput = ({ sendMessage, presentUsers }: ChatInputProps) => {
   const [input, setInput] = useState("");
   const [videoModal, setVideoModal] = useState(false);
   const [startCall, setStartCall] = useState(false); // Track explicit call start
@@ -82,6 +83,7 @@ const ChatInput = ({ sendMessage }: ChatInputProps) => {
         userId={user?.id || ""}
         allowMediaAccess={startCall}
         onStartCall={() => setStartCall(true)}
+        presentUsers={presentUsers} // <-- Pass present users
       />
     </div>
   );

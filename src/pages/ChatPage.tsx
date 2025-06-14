@@ -299,6 +299,50 @@ const ChatPage = () => {
 
   const handleMessageDeleted = () => {};
 
+  const [presentUsers, setPresentUsers] = useState<string[]>([]); // NEW: presence state
+
+  // --- Real-time presence logic ---
+  useEffect(() => {
+    if (!currentRoom || !user) return;
+    const channel = supabase.channel(`presence-chat-${currentRoom}`, {
+      config: { presence: { key: user.id } }
+    });
+
+    // Track yourself
+    channel.subscribe((status) => {
+      if (status !== "SUBSCRIBED") return;
+      channel.track({ user_id: user.id });
+    });
+
+    // Sync state whenever a presence event fires!
+    channel.on("presence", { event: "sync" }, () => {
+      const state = channel.presenceState() as { [userId: string]: Array<{ user_id: string }> };
+      // Parse present user ids from presence state
+      const ids = Object.values(state)
+        .flat()
+        .map((u) => u.user_id)
+        .filter(Boolean);
+      setPresentUsers(ids);
+    });
+
+    // On join/leave, update immediately
+    channel.on("presence", { event: "join" }, ({ key, newPresences }) => {
+      setPresentUsers(prev =>
+        Array.from(new Set([...prev, ...newPresences.map((p: any) => p.user_id)]))
+      );
+    });
+    channel.on("presence", { event: "leave" }, ({ key, leftPresences }) => {
+      setPresentUsers(prev =>
+        prev.filter(id => !leftPresences.some((lp: any) => lp.user_id === id))
+      );
+    });
+
+    // Clean up when room changes or unmounts
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentRoom, user]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50">
@@ -378,7 +422,8 @@ const ChatPage = () => {
           generateRoomAvatar={generateRoomAvatar}
           handleMessageDeleted={handleMessageDeleted}
         />
-        <ChatInput sendMessage={sendMessage} />
+        {/* Pass presentUsers to ChatInput */}
+        <ChatInput sendMessage={sendMessage} presentUsers={presentUsers} />
       </div>
     </div>
   );

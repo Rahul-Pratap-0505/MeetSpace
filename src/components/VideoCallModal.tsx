@@ -1,4 +1,3 @@
-
 import React, { useRef, useState } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -14,6 +13,7 @@ type VideoCallModalProps = {
   userId: string;
   allowMediaAccess?: boolean; // Only access camera/mic if this is true
   onStartCall?: () => void;   // Optional: callback for "Start Call" button
+  presentUsers?: string[];    // NEW: user ids present in current room
 };
 
 const VideoCallModal: React.FC<VideoCallModalProps> = ({
@@ -23,6 +23,7 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
   userId,
   allowMediaAccess = false,
   onStartCall,
+  presentUsers = [],
 }) => {
   const [error, setError] = useState<string | null>(null);
   const [callStatus, setCallStatus] = useState("");
@@ -104,6 +105,9 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
     setTimeout(() => acceptCall(), 100);
   };
 
+  // Helper: is user present in the room now?
+  const isUserPresent = presentUsers?.includes?.(userId);
+
   return (
     <Dialog open={open} onOpenChange={() => { onClose(); cleanup(); }}>
       <DialogContent className="max-w-xl p-0 border-0 rounded-xl overflow-hidden shadow-2xl flex flex-col bg-white animate-scale-in">
@@ -151,7 +155,8 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
               <div className="text-xs text-gray-400">You will be prompted to grant camera/mic access after pressing.</div>
             </div>
           )}
-          {(realStatus === "incoming" && !ready) && (
+          {/* INCOMING: Show Accept/Decline ONLY IF user present */}
+          {(realStatus === "incoming" && !ready && isUserPresent) && (
             <div className="flex flex-col items-center gap-3 mt-3">
               <Video className="h-10 w-10 text-yellow-600 mb-2 animate-pulse" />
               <div className="text-lg font-medium text-yellow-700">
