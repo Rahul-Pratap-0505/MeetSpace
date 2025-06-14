@@ -41,7 +41,7 @@ export function useChatMessages({ currentRoom, user }: UseChatMessagesProps) {
         .from("messages")
         .select("*")
         .eq("room_id", currentRoom)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: false }); // Changed to false
 
       if (messagesError) throw messagesError;
 
@@ -65,7 +65,6 @@ export function useChatMessages({ currentRoom, user }: UseChatMessagesProps) {
         })) || [];
 
       setMessages((prev) => {
-        // retain optimistic
         const optimistic = prev.filter((msg) => msg.id.startsWith("optimistic"));
         let updated = [...messagesWithProfiles];
         optimistic.forEach((optimisticMsg) => {
@@ -75,7 +74,8 @@ export function useChatMessages({ currentRoom, user }: UseChatMessagesProps) {
               m.content === optimisticMsg.content
           );
           if (matchIdx === -1) {
-            updated.push({
+            // Add optimistic messages to the start if they don't exist
+            updated.unshift({
               ...optimisticMsg,
               profiles: {
                 id: optimisticMsg.profiles?.id || optimisticMsg.sender_id,
@@ -85,7 +85,8 @@ export function useChatMessages({ currentRoom, user }: UseChatMessagesProps) {
             });
           }
         });
-        updated.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        // Ensure overall sort is descending by created_at
+        updated.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         return updated;
       });
     } catch (err: any) {
@@ -130,13 +131,17 @@ export function useChatMessages({ currentRoom, user }: UseChatMessagesProps) {
                 msg.id.startsWith("optimistic")
             );
             if (optimisticIdx !== -1) {
-              return [
-                ...prev.slice(0, optimisticIdx),
-                newMessage,
-                ...prev.slice(optimisticIdx + 1),
-              ];
+              // Replace optimistic message
+              const updatedMessages = [...prev];
+              updatedMessages[optimisticIdx] = newMessage;
+              // Re-sort to ensure newest is at top
+              updatedMessages.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+              return updatedMessages;
             } else {
-              return [...prev, newMessage];
+              // Add new message to the start and re-sort
+              const updatedMessages = [newMessage, ...prev];
+              updatedMessages.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+              return updatedMessages;
             }
           });
         }
@@ -181,11 +186,12 @@ export function useChatMessages({ currentRoom, user }: UseChatMessagesProps) {
       profiles: {
         id: user.id,
         username: user.user_metadata.username || user.email || "You",
-        avatar_url: null,
+        avatar_url: null, // Assuming user avatar might not be immediately available client-side
       },
     };
 
-    setMessages((prev) => [...prev, optimisticMessage]);
+    // Add optimistic message to the start of the array
+    setMessages((prev) => [optimisticMessage, ...prev]);
     resetInput();
 
     try {
@@ -197,8 +203,10 @@ export function useChatMessages({ currentRoom, user }: UseChatMessagesProps) {
         },
       ]);
       if (error) throw error;
-      if (messages.length === 0) fetchMessages();
+      // No need to call fetchMessages here if realtime is working correctly
+      // and optimistic update is replaced. If fetchMessages is needed, it would re-sort.
     } catch (err: any) {
+      // Remove optimistic message on error
       setMessages((prev) => prev.filter((msg) => msg.id !== optimisticId));
       toast.error("Error sending message: " + err.message);
     }
