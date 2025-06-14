@@ -190,6 +190,11 @@ const Chat = () => {
 
       if (error) throw error
       setNewMessage('')
+
+      // If there are no messages, fetch messages after sending
+      if (messages.length === 0) {
+        fetchMessages()
+      }
     } catch (error: any) {
       toast.error('Error sending message: ' + error.message)
     }
