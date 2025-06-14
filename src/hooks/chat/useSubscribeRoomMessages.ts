@@ -34,8 +34,14 @@ export function useSubscribeRoomMessages(setMessages: any) {
           };
 
           setMessages((prev: any[]) => {
+            // Fix: Filter for only objects that have the expected structure
             const optimisticIdx = prev.findIndex(
               (msg) =>
+                typeof msg === "object" &&
+                msg !== null &&
+                "sender_id" in msg &&
+                "content" in msg &&
+                typeof msg.id === "string" &&
                 msg.sender_id === newMessage.sender_id &&
                 msg.content === newMessage.content &&
                 msg.id.startsWith("optimistic")
