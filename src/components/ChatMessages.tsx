@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -28,6 +29,8 @@ export type ChatMessagesProps = {
   currentRoom: string;
   generateRoomAvatar: (name: string) => string;
   handleMessageDeleted: () => void;
+  typingUserIds?: string[];
+  presentUsers?: string[];
 };
 
 const ANIMATE_NEW_CLASS = "animate-fade-in";
@@ -38,16 +41,30 @@ const ChatMessages = ({
   rooms,
   currentRoom,
   generateRoomAvatar,
-  handleMessageDeleted
+  handleMessageDeleted,
+  typingUserIds = [],
+  presentUsers = [],
 }: ChatMessagesProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, typingUserIds]);
 
   // Responsive minimum height for scroll area
   const scrollAreaMinHeight = "min-h-[250px] sm:min-h-[350px]";
+
+  // Who is typing? Filter IDs to display names, exclude self
+  let typingDisplay = null;
+  if (typingUserIds.length) {
+    // Try to show usernames if possible from presentUsers
+    // Map IDs to "Someone" if can't resolve a username (you may want to improve this if you have a mapping)
+    // Since we have no profiles lookup for presentUsers here, just show generic message
+    typingDisplay =
+      typingUserIds.length === 1
+        ? `Someone is typing...`
+        : `Several people are typing...`;
+  }
 
   return (
     <>
@@ -127,6 +144,15 @@ const ChatMessages = ({
               </div>
             );
           })}
+          {/* Typing indicator */}
+          {typingDisplay && (
+            <div className="flex items-center space-x-2 mt-2 mb-1 px-4">
+              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 animate-pulse" />
+              <span className="text-sm text-muted-foreground italic select-none">
+                {typingDisplay}
+              </span>
+            </div>
+          )}
           <div ref={messagesEndRef} />
         </div>
       </ScrollArea>

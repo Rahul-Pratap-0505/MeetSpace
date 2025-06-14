@@ -300,39 +300,42 @@ const ChatPage = () => {
   const handleMessageDeleted = () => {};
 
   const [presentUsers, setPresentUsers] = useState<string[]>([]); // NEW: presence state
+  const [typingUsers, setTypingUsers] = useState<string[]>([]); // user IDs that are typing
 
-  // --- Real-time presence logic ---
+  // --- Real-time presence logic with typing signal ---
   useEffect(() => {
     if (!currentRoom || !user) return;
     const channel = supabase.channel(`presence-chat-${currentRoom}`, {
       config: { presence: { key: user.id } }
     });
 
-    // Track yourself
+    // Track yourself + initial typing=false
     channel.subscribe((status) => {
       if (status !== "SUBSCRIBED") return;
-      channel.track({ user_id: user.id });
+      channel.track({ user_id: user.id, typing: false });
     });
 
     // Sync state whenever a presence event fires!
     channel.on("presence", { event: "sync" }, () => {
-      const state = channel.presenceState() as { [userId: string]: Array<{ user_id: string }> };
+      const state = channel.presenceState() as { [userId: string]: Array<{ user_id: string, typing?: boolean }> };
       // Parse present user ids from presence state
-      const ids = Object.values(state)
-        .flat()
-        .map((u) => u.user_id)
-        .filter(Boolean);
-      setPresentUsers(ids);
+      const userStates = Object.values(state).flat();
+      setPresentUsers(userStates.map((u) => u.user_id).filter(Boolean));
+      // -- NEW: Gather who is typing --
+      setTypingUsers(userStates.filter((u) => u.typing && u.user_id !== user.id).map((u) => u.user_id));
     });
 
     // On join/leave, update immediately
-    channel.on("presence", { event: "join" }, ({ key, newPresences }) => {
-      setPresentUsers(prev =>
-        Array.from(new Set([...prev, ...newPresences.map((p: any) => p.user_id)]))
-      );
+    channel.on("presence", { event: "join" }, ({ newPresences }) => {
+      setPresentUsers((prev) =>
+        Array.from(new Set([...prev, ...newPresences.map((p: any) => p.user_id)])));
     });
-    channel.on("presence", { event: "leave" }, ({ key, leftPresences }) => {
-      setPresentUsers(prev =>
+    channel.on("presence", { event: "leave" }, ({ leftPresences }) => {
+      setPresentUsers((prev) =>
+        prev.filter(id => !leftPresences.some((lp: any) => lp.user_id === id))
+      );
+      // On leave, also remove from typingUsers if present
+      setTypingUsers((prev) =>
         prev.filter(id => !leftPresences.some((lp: any) => lp.user_id === id))
       );
     });
@@ -342,6 +345,36 @@ const ChatPage = () => {
       supabase.removeChannel(channel);
     };
   }, [currentRoom, user]);
+
+  // --- Typing indicator: methods to trigger start/stop typing state ---
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingChannelRef = useRef<any>(null);
+
+  // Update own typing state on chat input events (triggered from ChatInput)
+  const emitTyping = useCallback((isTyping: boolean) => {
+    // Send a presence update with typing value on the shared channel
+    if (!currentRoom || !user) return;
+    if (!typingChannelRef.current) {
+      // Attach channel, but avoid double subscribe logic
+      typingChannelRef.current = supabase.channel(`presence-chat-${currentRoom}`);
+    }
+    // This updates your presence state.
+    typingChannelRef.current.track({ user_id: user.id, typing: isTyping });
+  }, [currentRoom, user]);
+
+  // ChatInput will call these when user types
+  const handleTypingStart = () => {
+    emitTyping(true);
+    // Timeout: send typing:false after 2500ms of no typing to avoid "stuck" typing indication
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      emitTyping(false);
+    }, 2500);
+  };
+  const handleTypingStop = () => {
+    emitTyping(false);
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+  };
 
   if (loading) {
     return (
@@ -421,12 +454,22 @@ const ChatPage = () => {
           currentRoom={currentRoom}
           generateRoomAvatar={generateRoomAvatar}
           handleMessageDeleted={handleMessageDeleted}
+          // Pass anyone typing (as user IDs)
+          typingUserIds={typingUsers}
+          presentUsers={presentUsers}
         />
         {/* Pass presentUsers to ChatInput */}
-        <ChatInput sendMessage={sendMessage} presentUsers={presentUsers} />
+        <ChatInput
+          sendMessage={sendMessage}
+          presentUsers={presentUsers}
+          onTypingStart={handleTypingStart}
+          onTypingStop={handleTypingStop}
+        />
       </div>
     </div>
   );
 };
 
 export default ChatPage;
+
+// Note: File is getting very long (>400 lines)! Consider refactoring into smaller files for maintainability after this change.

@@ -10,15 +10,26 @@ import { useParams } from "react-router-dom";
 type ChatInputProps = {
   sendMessage: (text: string, resetInput: () => void) => void;
   presentUsers: string[];
+  // New props for typing indicator
+  onTypingStart?: () => void;
+  onTypingStop?: () => void;
 };
 
-const ChatInput = ({ sendMessage, presentUsers }: ChatInputProps) => {
+const ChatInput = ({
+  sendMessage,
+  presentUsers,
+  onTypingStart,
+  onTypingStop,
+}: ChatInputProps) => {
   const [input, setInput] = useState("");
   const [videoModal, setVideoModal] = useState(false);
   const [callSession, setCallSession] = useState<Date | null>(null); // Track call session to force modal open
   const { user } = useAuth();
   const params = useParams();
   const roomId = params?.roomId || "";
+
+  // Prevent spamming typing event (emit on each real keystroke, but debounce "stop")
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // New: Open modal for a new call session
   const handleStartVideoCall = () => {
@@ -35,6 +46,20 @@ const ChatInput = ({ sendMessage, presentUsers }: ChatInputProps) => {
     e.preventDefault();
     if (!input.trim()) return;
     sendMessage(input, () => setInput(""));
+    if (onTypingStop) onTypingStop(); // After sending, stop typing state
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInput(e.target.value);
+    if (onTypingStart) onTypingStart();
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      if (onTypingStop) onTypingStop();
+    }, 2200);
+  };
+
+  const handleBlur = () => {
+    if (onTypingStop) onTypingStop();
   };
 
   return (
@@ -45,7 +70,8 @@ const ChatInput = ({ sendMessage, presentUsers }: ChatInputProps) => {
       >
         <Input
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={handleInputChange}
+          onBlur={handleBlur}
           placeholder="Type a message..."
           className="flex-1 focus:border-blue-400 focus:ring-2 focus:ring-blue-300 transition-all duration-200 
             bg-white dark:bg-muted/60 dark:border-muted dark:text-foreground placeholder:text-gray-400 dark:placeholder:text-muted-foreground"
