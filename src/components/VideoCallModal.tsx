@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -45,7 +44,7 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
     manual: true,
   });
 
-  // Called whenever a new sessionKey, or a call is started, to sync modal open for everyone.
+  // Only show modal when there is a new call
   useEffect(() => {
     if (callSession) {
       setShowPrompt(true);
@@ -53,10 +52,7 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
       setShowPrompt(false);
     }
     setError(null);
-    // Cleanup when session ends or call cut
-    return () => {
-      cleanup();
-    };
+    // CLEANUP: remove auto-calling cleanup here: only explicitly call it on user actions
     // eslint-disable-next-line
   }, [callSession, roomId]);
 
@@ -69,20 +65,20 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
     await acceptCall();
   };
 
-  // End/cut: cleanup and close prompt
+  // End/cut: cleanup and close prompt (user explicit close)
   const handleDeclineOrCut = () => {
     setShowPrompt(false);
     cleanup();
     onClose();
   };
 
-  // If the user closes tab or navigates away, cleanup
-  useEffect(() => {
-    return () => {
-      cleanup();
-    };
-    // eslint-disable-next-line
-  }, []);
+  // Remove: do not cleanup on unmount (anyone else leaving will not kill local video)
+  // useEffect(() => {
+  //   return () => {
+  //     cleanup();
+  //   };
+  //   // eslint-disable-next-line
+  // }, []);
 
   return (
     <Dialog open={open && showPrompt && isUserPresent} onOpenChange={handleDeclineOrCut}>

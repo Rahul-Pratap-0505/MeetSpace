@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 
@@ -243,6 +242,7 @@ export const useVideoCall = ({
         if (msg.type === "decline" && callStatus === "ringing") {
           setCallStatus("ended");
           onError?.("User declined.");
+          // DO NOT call cleanup(); local user keeps their camera open until they close/leave the call
         }
         if (msg.type === "accept" && callStatus === "ringing") {
           console.log("Peer accepted, connecting to:", msg.sender);
@@ -320,6 +320,7 @@ export const useVideoCall = ({
         },
       });
     }
+    // CLEANUP only on user action (not when remote peer triggers "decline")
     cleanup();
     console.log("Declined call:", userId);
   }, [userId, inviter, cleanup]);
