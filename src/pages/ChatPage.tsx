@@ -204,7 +204,6 @@ const ChatPage = () => {
           handleMessageDeleted={handleMessageDeleted}
           typingUserIds={typingUsers}
           presentUsers={presentUsers}
-          loading={loading}
         />
         <ChatInput
           sendMessage={sendMessage}
