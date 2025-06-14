@@ -1,5 +1,5 @@
 
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Video, PhoneCall } from "lucide-react";
@@ -25,9 +25,8 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
 }) => {
   const [error, setError] = useState<string | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
-  const [showPrompt, setShowPrompt] = useState(false);
 
-  // New: Always start preview when modal opens, and cleanup when closes
+  // NEW: Always start preview when modal opens, and cleanup when closes
   const [previewActive, setPreviewActive] = useState(false);
 
   const {
@@ -51,41 +50,23 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
     manual: true,
   });
 
-  // Show modal for new call session
+  // ====== FIX: Derive showPrompt directly from callSession
+  const showPrompt = useMemo(() => !!callSession, [callSession]);
+  // Clear error only when callSession changes
   useEffect(() => {
-    setShowPrompt(!!callSession);
-    setError(null);
-  }, [callSession, roomId, open]);
-
-  // Always open preview camera on modal open, except when connected (already in call)
-  useEffect(() => {
-    if (open && showPrompt && callStatus !== "connected") {
-      if (!previewActive) {
-        startLocalPreview && startLocalPreview();
-        setPreviewActive(true);
-      }
-    } else {
-      // If modal closes or user joins the call, stop preview
-      if (previewActive) {
-        stopLocalPreview && stopLocalPreview();
-        setPreviewActive(false);
-      }
-    }
-    // eslint-disable-next-line
-  }, [open, showPrompt, callStatus]);
+    if (error) setError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callSession]);
 
   // Is user present in room?
   const isUserPresent = presentUsers?.includes?.(userId);
 
   // Accept/join: join call with media/signaling
   const handleAccept = async () => {
-    // IMPORTANT: stop preview camera before starting real call camera
     if (previewActive) {
-      console.debug("VideoCallModal: Stopping preview before joining call");
       stopLocalPreview && stopLocalPreview();
       setPreviewActive(false);
     }
-    // Small delay to ensure camera is released before requesting again
     await new Promise((res) => setTimeout(res, 100));
     await initializeMediaAndSignaling();
     await acceptCall();
@@ -93,11 +74,35 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
 
   // End/cut: cleanup and close prompt (user explicit close)
   const handleDeclineOrCut = () => {
-    setShowPrompt(false);
     cleanup();
     setPreviewActive(false);
     onClose();
   };
+
+  // ====== FIX: Only start/stop preview according to actual entering/leaving preview
+  useEffect(() => {
+    // If not supposed to show, make sure preview is off
+    if (!open || !showPrompt || callStatus === "connected") {
+      if (previewActive) {
+        stopLocalPreview && stopLocalPreview();
+        setPreviewActive(false);
+      }
+      return;
+    }
+    // Start preview only if entering preview mode
+    if (!previewActive) {
+      startLocalPreview && startLocalPreview();
+      setPreviewActive(true);
+    }
+    // Cleanup preview on unmount just in case
+    return () => {
+      if (previewActive) {
+        stopLocalPreview && stopLocalPreview();
+        setPreviewActive(false);
+      }
+    };
+    // eslint-disable-next-line
+  }, [open, showPrompt, callStatus]);
 
   return (
     <Dialog open={open && showPrompt && isUserPresent} onOpenChange={handleDeclineOrCut}>
@@ -175,4 +180,3 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
 };
 
 export default VideoCallModal;
-
