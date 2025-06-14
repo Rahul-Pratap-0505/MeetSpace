@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -66,7 +67,7 @@ const ChatMessages = ({
                 </span>
               </div>
               <div>
-                <h2 className="font-semibold text-gray-900">
+                <h2 className="font-semibold text-gray-900 dark:text-foreground">
                   {rooms.find((r) => r.id === currentRoom)?.name || "Select a room"}
                 </h2>
                 <p className="text-sm text-gray-500">{messages.length} messages</p>
@@ -98,11 +99,14 @@ const ChatMessages = ({
                   </Avatar>
                   <div className="flex-1">
                     <div
-                      className={`px-3 py-2 rounded-lg relative break-words transition-transform duration-150 shadow-sm ${
-                        isOwn
-                          ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white animate-scale-in"
-                          : "bg-white dark:bg-muted text-foreground shadow-sm border animate-fade-in"
-                      }`}
+                      className={`px-3 py-2 rounded-lg relative break-words transition-transform duration-150 shadow-sm
+                        ${
+                          isOwn
+                            ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white animate-scale-in"
+                            : "bg-white border shadow-sm animate-fade-in dark:bg-muted/60 dark:border-muted dark:text-foreground"
+                        }
+                        ${!isOwn ? "hover:dark:bg-muted/80 focus:dark:bg-muted/70 transition" : ""}
+                      `}
                     >
                       <p className="text-sm">{message.content}</p>
                       {isOwn && (
