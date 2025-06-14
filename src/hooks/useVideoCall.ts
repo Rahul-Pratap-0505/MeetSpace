@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 
@@ -23,7 +24,7 @@ type UseVideoCallOptions = {
   onError?: (msg: string) => void;
   onStatusChange?: (status: string) => void;
   onInviterChange?: (id: string | null) => void;
-  manual?: boolean; // new prop - if true: do not initialize signaling/media until requested
+  manual?: boolean;
 };
 
 export const useVideoCall = ({
@@ -39,17 +40,18 @@ export const useVideoCall = ({
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
   const [peers, setPeers] = useState<{ [id: string]: PeerInfo }>({});
   const [inviter, setInviter] = useState<string | null>(null);
-  const [ready, setReady] = useState(false); // mark when both signaling & media ready
-  const [mediaLoading, setMediaLoading] = useState(false); // NEW: Track if camera is loading
+  const [ready, setReady] = useState(false);
+  const [mediaLoading, setMediaLoading] = useState(false);
   const callChannelRef = useRef<any>(null);
   const peerRefs = useRef<{ [id: string]: PeerInfo }>({});
+  const [connectedPeers, setConnectedPeers] = useState<Set<string>>(new Set());
 
   const SIGNAL_CHANNEL = `video-signal-${roomId}`;
   const RTC_CONFIG = {
     iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
   };
 
-  // --- PEER CONNECTION MANAGEMENT --- (add log, same logic)
+  // --- PEER CONNECTION MANAGEMENT ---
   const connectToPeer = useCallback(async (peerId: string, isInitiator: boolean) => {
     if (peerRefs.current[peerId]) return;
     console.log(`Connecting to peer: ${peerId} as ${isInitiator ? "initiator" : "callee"}`);
@@ -59,10 +61,12 @@ export const useVideoCall = ({
     const remoteVideo = { current: document.createElement("video") } as React.RefObject<HTMLVideoElement>;
 
     pc.ontrack = (event) => {
+      console.log("Received remote track from", peerId);
       if (remoteVideo.current) {
         remoteVideo.current.srcObject = event.streams[0];
       }
     };
+
     pc.onicecandidate = (event) => {
       if (event.candidate && callChannelRef.current) {
         callChannelRef.current.send({
@@ -77,21 +81,31 @@ export const useVideoCall = ({
         });
       }
     };
+
     pc.onconnectionstatechange = () => {
-      console.log("PeerConnection state:", pc.connectionState);
-      if (pc.connectionState === "connected") setCallStatus("connected");
+      console.log(`PeerConnection with ${peerId} state:`, pc.connectionState);
+      if (pc.connectionState === "connected") {
+        setConnectedPeers(prev => new Set([...prev, peerId]));
+        setCallStatus("connected");
+      }
       if (
         pc.connectionState === "failed" ||
         pc.connectionState === "disconnected" ||
         pc.connectionState === "closed"
       ) {
-        setCallStatus("ended");
+        setConnectedPeers(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(peerId);
+          return newSet;
+        });
         setPeers((p) => {
           delete p[peerId];
           return { ...p };
         });
+        delete peerRefs.current[peerId];
       }
     };
+
     peerRefs.current[peerId] = { id: peerId, pc, remoteVideoRef: remoteVideo };
     setPeers((p) => ({ ...p, [peerId]: { id: peerId, pc, remoteVideoRef: remoteVideo } }));
 
@@ -111,14 +125,14 @@ export const useVideoCall = ({
     }
   }, [mediaStream, userId]);
 
-  // --- Handle incoming offer/answer/ICE --- (add log, same logic)
+  // --- Handle incoming offer/answer/ICE ---
   const handleSignal = useCallback(async (peerId: string, msg: GroupSignalData) => {
     if (!peerRefs.current[peerId]) {
       await connectToPeer(peerId, false);
     }
     const pc = peerRefs.current[peerId]?.pc;
     if (!pc) return;
-    console.log("Handling signal from", peerId, msg);
+    console.log("Handling signal from", peerId, msg.type);
 
     if (msg.sdp) {
       await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp!));
@@ -150,6 +164,8 @@ export const useVideoCall = ({
   const cleanup = useCallback(() => {
     Object.values(peerRefs.current).forEach(({ pc }) => pc.close());
     setPeers({});
+    peerRefs.current = {};
+    setConnectedPeers(new Set());
     if (mediaStream) {
       mediaStream.getTracks().forEach((t) => t.stop());
     }
@@ -178,10 +194,8 @@ export const useVideoCall = ({
         audio: true,
       });
       setMediaStream(stream);
-      // set the srcObject even if already set
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
-        // New: try to force play and log
         localVideoRef.current.onloadedmetadata = () => {
           console.log("Local video loaded metadata, attempting to play...");
           localVideoRef.current?.play();
@@ -190,7 +204,7 @@ export const useVideoCall = ({
       }
       setMediaLoading(false);
       console.log("Got user media for:", userId);
-    } catch (err) {
+    } catch (err: any) {
       setMediaLoading(false);
       if (err.name === "NotAllowedError") {
         onError?.("Camera/mic permission denied. Please allow access in your browser.");
@@ -205,7 +219,6 @@ export const useVideoCall = ({
   // --- Signaling setup ---
   const setupSignaling = useCallback(async () => {
     console.log("Setting up signaling for", SIGNAL_CHANNEL, "user:", userId);
-    // Clean old channel if exists
     if (callChannelRef.current) {
       try { supabase.removeChannel(callChannelRef.current); } catch {}
     }
@@ -216,12 +229,13 @@ export const useVideoCall = ({
     channel
       .on("broadcast", { event: "groupcall" }, async (payload) => {
         const msg: GroupSignalData = payload.payload;
-        if (msg.sender === userId) return; // Don't process own events
+        if (msg.sender === userId) return;
         if (!mediaStream) {
           console.log("No local media yet, skipping signaling event", msg);
           return;
         }
         console.log("Signaling event received:", msg, "Current status:", callStatus);
+        
         if (msg.type === "invite" && (callStatus === "idle" || callStatus === "")) {
           setInviter(msg.sender);
           setCallStatus("incoming");
@@ -231,16 +245,20 @@ export const useVideoCall = ({
           onError?.("User declined.");
         }
         if (msg.type === "accept" && callStatus === "ringing") {
+          console.log("Peer accepted, connecting to:", msg.sender);
           await connectToPeer(msg.sender, true);
           setCallStatus("connecting");
         }
         if (msg.type === "signal") {
-          await handleSignal(msg.sender, msg);
+          if (msg.target === userId || !msg.target) {
+            await handleSignal(msg.sender, msg);
+          }
         }
       })
       .subscribe((s: any) => {
         if (s === "SUBSCRIBED") {
           callChannelRef.current = channel;
+          console.log("Subscribed to signaling channel");
         }
       });
   }, [SIGNAL_CHANNEL, userId, mediaStream, callStatus, onError, connectToPeer, handleSignal]);
@@ -274,7 +292,7 @@ export const useVideoCall = ({
   // --- Accept/Decline handlers ---
   const acceptCall = useCallback(async () => {
     setCallStatus("connecting");
-    if (callChannelRef.current) {
+    if (callChannelRef.current && inviter) {
       callChannelRef.current.send({
         type: "broadcast",
         event: "groupcall",
@@ -283,9 +301,10 @@ export const useVideoCall = ({
           sender: userId,
         },
       });
+      console.log("Accepted call, connecting as callee", userId);
+      // Connect to the inviter
+      await connectToPeer(inviter, false);
     }
-    console.log("Accepted call, connecting as callee", userId);
-    await connectToPeer(inviter!, false);
   }, [userId, inviter, connectToPeer]);
 
   const declineCall = useCallback(() => {
@@ -306,8 +325,8 @@ export const useVideoCall = ({
   }, [userId, inviter, cleanup]);
 
   // Expose state for parent
-  useEffect(() => { onStatusChange?.(callStatus); }, [callStatus]);
-  useEffect(() => { onInviterChange?.(inviter); }, [inviter]);
+  useEffect(() => { onStatusChange?.(callStatus); }, [callStatus, onStatusChange]);
+  useEffect(() => { onInviterChange?.(inviter); }, [inviter, onInviterChange]);
 
   // -- Automatic start for open, UNLESS in manual mode
   useEffect(() => {
@@ -317,12 +336,9 @@ export const useVideoCall = ({
       });
       return cleanup;
     }
-    // otherwise only run cleanup on unmount
     return cleanup;
-    // eslint-disable-next-line
-  }, []);
+  }, [manual, startLocalMedia, setupSignaling, cleanup]);
 
-  // Expose mediaLoading to UI
   return {
     callStatus,
     peers,
