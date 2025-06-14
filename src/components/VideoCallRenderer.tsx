@@ -15,6 +15,16 @@ const VideoCallRenderer: React.FC<Props> = ({
   inviter,
   localVideoRef,
 }) => {
+  // New: handle loaded metadata event
+  const handleLoadedMetadata = () => {
+    console.log("Local video element loaded metadata, ready to play!");
+    localVideoRef.current?.play();
+  };
+
+  const handleVideoError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
+    console.error("Error with local webcam video", e);
+  };
+
   const renderVideos = () => {
     const peerVideos = Object.values(peers).map(({ id, remoteVideoRef }) => (
       <div key={id} className="w-52 h-40 bg-gray-200 rounded-lg shadow flex items-center justify-center overflow-hidden ring-2 ring-purple-300 animate-fade-in mx-2">
@@ -38,6 +48,8 @@ const VideoCallRenderer: React.FC<Props> = ({
             autoPlay
             muted
             playsInline
+            onLoadedMetadata={handleLoadedMetadata}
+            onError={handleVideoError}
             className="w-full h-full object-cover"
             style={{ background: "#ccc" }}
           />

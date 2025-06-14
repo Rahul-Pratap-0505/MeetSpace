@@ -181,12 +181,22 @@ export const useVideoCall = ({
       // set the srcObject even if already set
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
+        // New: try to force play and log
+        localVideoRef.current.onloadedmetadata = () => {
+          console.log("Local video loaded metadata, attempting to play...");
+          localVideoRef.current?.play();
+        };
+        console.log("Assigned webcam stream to video element");
       }
       setMediaLoading(false);
       console.log("Got user media for:", userId);
     } catch (err) {
       setMediaLoading(false);
-      onError?.("Could not access camera or microphone.");
+      if (err.name === "NotAllowedError") {
+        onError?.("Camera/mic permission denied. Please allow access in your browser.");
+      } else {
+        onError?.("Could not access camera or microphone.");
+      }
       setCallStatus("ended");
       console.error("Failed to access camera/mic", err);
     }
