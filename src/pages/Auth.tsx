@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
@@ -56,11 +55,10 @@ const Auth = () => {
             <MessageCircle className="h-8 w-8 text-primary-foreground" />
           </div>
           <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            {/* PROJECT NAME HERE */}
-            {isLogin ? 'Welcome Back to TalkSphere' : 'Create your TalkSphere account'}
+            {isLogin ? 'Welcome Back to MeetSpace' : 'Create your MeetSpace account'}
           </CardTitle>
           <CardDescription className="text-muted-foreground">
-            {isLogin ? 'Sign in to continue chatting' : 'Join TalkSphere and start connecting'}
+            {isLogin ? 'Sign in to continue chatting' : 'Join MeetSpace and start connecting'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
