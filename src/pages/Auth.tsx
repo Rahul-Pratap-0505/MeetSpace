@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { MessageCircle, Mail, Lock, User, Chrome } from 'lucide-react'
+import { MessageCircle, Mail, Lock, User, Chrome, Copyright } from 'lucide-react'
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true)
@@ -137,6 +137,11 @@ const Auth = () => {
           </div>
         </CardContent>
       </Card>
+      {/* Footer copyright */}
+      <div className="mt-6 flex justify-center items-center gap-1 text-muted-foreground text-xs select-none">
+        <Copyright size={14} className="inline-block" />
+        <span>Created by Rahul Pratap</span>
+      </div>
     </div>
   )
 }
