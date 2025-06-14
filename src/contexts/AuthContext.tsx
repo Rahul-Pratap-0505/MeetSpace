@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { User, AuthChangeEvent } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
@@ -55,7 +54,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(session?.user ?? null)
         setLoading(false)
         
-        if (event === 'SIGNED_UP' && session?.user) {
+        if (event === "SIGNED_UP" as AuthChangeEvent && session?.user) {
           // Profile creation is handled by the database trigger
           console.log('User signed up, profile will be created automatically')
         }

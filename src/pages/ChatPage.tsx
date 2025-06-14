@@ -17,6 +17,7 @@ type Message = {
   created_at: string;
   room_id: string;
   profiles?: {
+    id: string;
     username: string;
     avatar_url: string | null;
   } | null;
@@ -108,9 +109,13 @@ const ChatPage = () => {
       let messagesWithProfiles =
         messagesData?.map((message) => ({
           ...message,
-          profiles: profilesData?.find((profile) => profile.id === message.sender_id) || null,
+          profiles:
+            profilesData?.find((profile) => profile.id === message.sender_id) || {
+              id: message.sender_id,
+              username: "Unknown",
+              avatar_url: null,
+            },
         })) || [];
-
       // --- FIX: keep optimistic messages UNTIL replaced by real ones ---
       setMessages((prev) => {
         // gather any optimistic messages present in state
