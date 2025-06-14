@@ -10,6 +10,7 @@ export const useMediaStream = ({
   const [mediaLoading, setMediaLoading] = useState(false);
   const [localPreviewActive, setLocalPreviewActive] = useState(false);
 
+  // Defensive: only stop preview if it's actually a preview stream (do not clear if being reused for call)
   const startLocalPreview = useCallback(async () => {
     if (localPreviewActive || mediaStream) return;
     setMediaLoading(true);
@@ -27,6 +28,7 @@ export const useMediaStream = ({
         };
       }
       setMediaLoading(false);
+      console.debug("MediaStream: started preview stream");
     } catch (err: any) {
       setMediaLoading(false);
       if (err.name === "NotAllowedError") {
@@ -39,8 +41,10 @@ export const useMediaStream = ({
   }, [localPreviewActive, localVideoRef, mediaStream, onError, userId]);
 
   const stopLocalPreview = useCallback(() => {
+    // Only stop if preview flag set
     if (!localPreviewActive) return;
     if (mediaStream) {
+      console.debug("MediaStream: stopping preview stream (not main call)");
       mediaStream.getTracks().forEach((t) => t.stop());
     }
     setMediaStream(null);
@@ -51,9 +55,11 @@ export const useMediaStream = ({
     setMediaLoading(false);
   }, [localPreviewActive, mediaStream, localVideoRef, userId]);
 
+  // This is used for the actual main call, after preview
   const startLocalMedia = useCallback(async () => {
     setMediaLoading(true);
     try {
+      console.debug("MediaStream: starting main camera for call");
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 640 }, height: { ideal: 400 } },
         audio: true,

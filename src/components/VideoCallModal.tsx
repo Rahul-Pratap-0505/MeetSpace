@@ -79,6 +79,14 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
 
   // Accept/join: join call with media/signaling
   const handleAccept = async () => {
+    // IMPORTANT: stop preview camera before starting real call camera
+    if (previewActive) {
+      console.debug("VideoCallModal: Stopping preview before joining call");
+      stopLocalPreview && stopLocalPreview();
+      setPreviewActive(false);
+    }
+    // Small delay to ensure camera is released before requesting again
+    await new Promise((res) => setTimeout(res, 100));
     await initializeMediaAndSignaling();
     await acceptCall();
   };
@@ -167,3 +175,4 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
 };
 
 export default VideoCallModal;
+
