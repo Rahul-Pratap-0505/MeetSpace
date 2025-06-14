@@ -1,6 +1,6 @@
 
 import React from "react";
-import { PeerInfo } from "@/hooks/useVideoCall";
+import { PeerInfo } from "@/hooks/videoCallTypes";
 
 type Props = {
   callStatus: string;
