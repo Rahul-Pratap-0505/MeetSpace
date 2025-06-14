@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 
@@ -50,9 +49,121 @@ export const useVideoCall = ({
     iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
   };
 
-  // Expose state for parent
-  useEffect(() => { onStatusChange?.(callStatus); }, [callStatus]);
-  useEffect(() => { onInviterChange?.(inviter); }, [inviter]);
+  // --- PEER CONNECTION MANAGEMENT --- (add log, same logic)
+  const connectToPeer = useCallback(async (peerId: string, isInitiator: boolean) => {
+    if (peerRefs.current[peerId]) return;
+    console.log(`Connecting to peer: ${peerId} as ${isInitiator ? "initiator" : "callee"}`);
+    const pc = new RTCPeerConnection(RTC_CONFIG);
+
+    mediaStream?.getTracks().forEach((track) => pc.addTrack(track, mediaStream));
+    const remoteVideo = { current: document.createElement("video") } as React.RefObject<HTMLVideoElement>;
+
+    pc.ontrack = (event) => {
+      if (remoteVideo.current) {
+        remoteVideo.current.srcObject = event.streams[0];
+      }
+    };
+    pc.onicecandidate = (event) => {
+      if (event.candidate && callChannelRef.current) {
+        callChannelRef.current.send({
+          type: "broadcast",
+          event: "groupcall",
+          payload: {
+            type: "signal",
+            sender: userId,
+            candidate: event.candidate,
+            target: peerId,
+          },
+        });
+      }
+    };
+    pc.onconnectionstatechange = () => {
+      console.log("PeerConnection state:", pc.connectionState);
+      if (pc.connectionState === "connected") setCallStatus("connected");
+      if (
+        pc.connectionState === "failed" ||
+        pc.connectionState === "disconnected" ||
+        pc.connectionState === "closed"
+      ) {
+        setCallStatus("ended");
+        setPeers((p) => {
+          delete p[peerId];
+          return { ...p };
+        });
+      }
+    };
+    peerRefs.current[peerId] = { id: peerId, pc, remoteVideoRef: remoteVideo };
+    setPeers((p) => ({ ...p, [peerId]: { id: peerId, pc, remoteVideoRef: remoteVideo } }));
+
+    if (isInitiator) {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      callChannelRef.current?.send({
+        type: "broadcast",
+        event: "groupcall",
+        payload: {
+          type: "signal",
+          sdp: offer,
+          sender: userId,
+          target: peerId,
+        },
+      });
+    }
+  }, [mediaStream, userId]);
+
+  // --- Handle incoming offer/answer/ICE --- (add log, same logic)
+  const handleSignal = useCallback(async (peerId: string, msg: GroupSignalData) => {
+    if (!peerRefs.current[peerId]) {
+      await connectToPeer(peerId, false);
+    }
+    const pc = peerRefs.current[peerId]?.pc;
+    if (!pc) return;
+    console.log("Handling signal from", peerId, msg);
+
+    if (msg.sdp) {
+      await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp!));
+      if (msg.sdp!.type === "offer") {
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        callChannelRef.current?.send({
+          type: "broadcast",
+          event: "groupcall",
+          payload: {
+            type: "signal",
+            sdp: answer,
+            sender: userId,
+            target: peerId,
+          },
+        });
+      }
+    }
+    if (msg.candidate) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
+      } catch (e) {
+        console.error("Failed to add ICE candidate", e);
+      }
+    }
+  }, [connectToPeer, userId]);
+
+  // --- CLEANUP ---
+  const cleanup = useCallback(() => {
+    Object.values(peerRefs.current).forEach(({ pc }) => pc.close());
+    setPeers({});
+    if (mediaStream) {
+      mediaStream.getTracks().forEach((t) => t.stop());
+    }
+    setMediaStream(null);
+    if (callChannelRef.current) {
+      supabase.removeChannel(callChannelRef.current);
+      callChannelRef.current = null;
+    }
+    setInviter(null);
+    setReady(false);
+    setCallStatus(manual ? "" : "ended");
+    setMediaLoading(false);
+    console.log("Cleaned up call state");
+  }, [mediaStream, manual]);
 
   // --- Media setup ---
   const startLocalMedia = useCallback(async () => {
@@ -181,121 +292,9 @@ export const useVideoCall = ({
     console.log("Declined call:", userId);
   }, [userId, inviter, cleanup]);
 
-  // --- PEER CONNECTION MANAGEMENT --- (add log, same logic)
-  const connectToPeer = useCallback(async (peerId: string, isInitiator: boolean) => {
-    if (peerRefs.current[peerId]) return;
-    console.log(`Connecting to peer: ${peerId} as ${isInitiator ? "initiator" : "callee"}`);
-    const pc = new RTCPeerConnection(RTC_CONFIG);
-
-    mediaStream?.getTracks().forEach((track) => pc.addTrack(track, mediaStream));
-    const remoteVideo = { current: document.createElement("video") } as React.RefObject<HTMLVideoElement>;
-
-    pc.ontrack = (event) => {
-      if (remoteVideo.current) {
-        remoteVideo.current.srcObject = event.streams[0];
-      }
-    };
-    pc.onicecandidate = (event) => {
-      if (event.candidate && callChannelRef.current) {
-        callChannelRef.current.send({
-          type: "broadcast",
-          event: "groupcall",
-          payload: {
-            type: "signal",
-            sender: userId,
-            candidate: event.candidate,
-            target: peerId,
-          },
-        });
-      }
-    };
-    pc.onconnectionstatechange = () => {
-      console.log("PeerConnection state:", pc.connectionState);
-      if (pc.connectionState === "connected") setCallStatus("connected");
-      if (
-        pc.connectionState === "failed" ||
-        pc.connectionState === "disconnected" ||
-        pc.connectionState === "closed"
-      ) {
-        setCallStatus("ended");
-        setPeers((p) => {
-          delete p[peerId];
-          return { ...p };
-        });
-      }
-    };
-    peerRefs.current[peerId] = { id: peerId, pc, remoteVideoRef: remoteVideo };
-    setPeers((p) => ({ ...p, [peerId]: { id: peerId, pc, remoteVideoRef: remoteVideo } }));
-
-    if (isInitiator) {
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      callChannelRef.current?.send({
-        type: "broadcast",
-        event: "groupcall",
-        payload: {
-          type: "signal",
-          sdp: offer,
-          sender: userId,
-          target: peerId,
-        },
-      });
-    }
-  }, [mediaStream, userId]);
-
-  // --- Handle incoming offer/answer/ICE --- (add log, same logic)
-  const handleSignal = useCallback(async (peerId: string, msg: GroupSignalData) => {
-    if (!peerRefs.current[peerId]) {
-      await connectToPeer(peerId, false);
-    }
-    const pc = peerRefs.current[peerId]?.pc;
-    if (!pc) return;
-    console.log("Handling signal from", peerId, msg);
-
-    if (msg.sdp) {
-      await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp!));
-      if (msg.sdp!.type === "offer") {
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        callChannelRef.current?.send({
-          type: "broadcast",
-          event: "groupcall",
-          payload: {
-            type: "signal",
-            sdp: answer,
-            sender: userId,
-            target: peerId,
-          },
-        });
-      }
-    }
-    if (msg.candidate) {
-      try {
-        await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
-      } catch (e) {
-        console.error("Failed to add ICE candidate", e);
-      }
-    }
-  }, [connectToPeer, userId]);
-
-  // --- CLEANUP ---
-  const cleanup = useCallback(() => {
-    Object.values(peerRefs.current).forEach(({ pc }) => pc.close());
-    setPeers({});
-    if (mediaStream) {
-      mediaStream.getTracks().forEach((t) => t.stop());
-    }
-    setMediaStream(null);
-    if (callChannelRef.current) {
-      supabase.removeChannel(callChannelRef.current);
-      callChannelRef.current = null;
-    }
-    setInviter(null);
-    setReady(false);
-    setCallStatus(manual ? "" : "ended");
-    setMediaLoading(false);
-    console.log("Cleaned up call state");
-  }, [mediaStream, manual]);
+  // Expose state for parent
+  useEffect(() => { onStatusChange?.(callStatus); }, [callStatus]);
+  useEffect(() => { onInviterChange?.(inviter); }, [inviter]);
 
   // -- Automatic start for open, UNLESS in manual mode
   useEffect(() => {
