@@ -66,7 +66,7 @@ const ChatPage = () => {
     } catch (error: any) {
       toast.error("Error fetching rooms: " + error.message);
     } finally {
-      // setLoading(false); // Loading is now handled by the useChatMessages hook
+      // Loading is now handled by the useChatMessages hook
     }
   };
 
@@ -211,7 +211,6 @@ const ChatPage = () => {
           handleMessageDeleted={handleMessageDeleted}
           typingUserIds={typingUsers}
           presentUsers={presentUsers}
-          loading={roomLoading}
         />
         <ChatInput
           sendMessage={sendMessage}
