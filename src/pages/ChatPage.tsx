@@ -36,7 +36,7 @@ const ChatPage = () => {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [currentRoom, setCurrentRoom] = useState("");
   const isMobile = useIsMobile();
-  const [sidebarOpen, setSidebarOpen] = useState(!isMobile); // Use only useState, not useReactState
+  const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
 
   // Memoize Sidebar to avoid re-creation on every render
   const MemoSidebar = useMemo(() => React.memo(ChatSidebar), []);
@@ -69,6 +69,7 @@ const ChatPage = () => {
     }
   };
 
+  // ---- Flicker Fix: Use a transition state for messages ----
   const {
     messages,
     loading,
@@ -76,6 +77,47 @@ const ChatPage = () => {
     fetchMessages,
     setMessages
   } = useChatMessages({ currentRoom, user });
+
+  // Displayed messages shown in the chat UI, only updated after messages for new room are loaded
+  const [displayedMessages, setDisplayedMessages] = useState<Message[]>([]);
+  const [roomLoading, setRoomLoading] = useState(false);
+  const lastRoomRef = useRef<string>("");
+
+  useEffect(() => {
+    // On room change, keep showing old messages until new ones are ready
+    if (currentRoom && currentRoom !== lastRoomRef.current) {
+      setRoomLoading(true);
+    }
+  }, [currentRoom]);
+
+  useEffect(() => {
+    if (!roomLoading) return;
+    if (!loading) {
+      // When new messages loaded, update displayed
+      setDisplayedMessages(messages);
+      setRoomLoading(false);
+      lastRoomRef.current = currentRoom;
+    }
+    // When loading, keep displaying previous
+  }, [messages, loading, roomLoading, currentRoom]);
+
+  // When initially loaded, ensure displayedMessages is set at mount
+  useEffect(() => {
+    if (displayedMessages.length === 0 && messages.length && !loading) {
+      setDisplayedMessages(messages);
+      lastRoomRef.current = currentRoom;
+    }
+    // eslint-disable-next-line
+  }, []);
+
+  // Side effect: If user switches to a room for the first time
+  useEffect(() => {
+    if (currentRoom && !roomLoading && !loading && messages.length !== displayedMessages.length) {
+      setDisplayedMessages(messages);
+      lastRoomRef.current = currentRoom;
+    }
+    // eslint-disable-next-line
+  }, [currentRoom, loading]);
 
   const {
     presentUsers,
@@ -113,6 +155,8 @@ const ChatPage = () => {
       setCurrentRoom("");
       setMessages([]);
     }
+    // Fix: also clear displayedMessages when all rooms gone
+    setDisplayedMessages([]);
   };
   const handleMessageDeleted = () => {};
 
@@ -194,9 +238,9 @@ const ChatPage = () => {
           ${isMobile && sidebarOpen ? "pointer-events-none blur-sm scale-95" : ""}
         `}
       >
-        {/* Only show loading inside ChatMessages, not as a full overlay */}
+        {/* ChatMessages: loading transition fix */}
         <ChatMessages
-          messages={messages}
+          messages={roomLoading ? displayedMessages : messages}
           userId={user?.id}
           rooms={rooms}
           currentRoom={currentRoom}
