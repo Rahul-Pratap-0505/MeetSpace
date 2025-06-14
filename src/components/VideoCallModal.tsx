@@ -6,11 +6,14 @@ import { Video, PhoneCall } from "lucide-react";
 import VideoCallRenderer from "./VideoCallRenderer";
 import { useVideoCall } from "@/hooks/useVideoCall";
 
+// Extend props to control when to start the call (media access)
 type VideoCallModalProps = {
   open: boolean;
   onClose: () => void;
   roomId: string;
   userId: string;
+  allowMediaAccess?: boolean; // Only access camera/mic if this is true
+  onStartCall?: () => void;   // Optional: callback for "Start Call" button
 };
 
 const VideoCallModal: React.FC<VideoCallModalProps> = ({
@@ -18,6 +21,8 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
   onClose,
   roomId,
   userId,
+  allowMediaAccess = false,
+  onStartCall,
 }) => {
   const [error, setError] = useState<string | null>(null);
   const [callStatus, setCallStatus] = useState("");
@@ -32,6 +37,8 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
     cleanup,
     peers,
     inviter: realInviter,
+    ready, // NEW: Is signaling/media ready
+    initializeMediaAndSignaling, // NEW: trigger the setup on demand
   } = useVideoCall({
     roomId,
     userId,
@@ -39,6 +46,7 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
     onError: (msg) => setError(msg),
     onStatusChange: (status) => setCallStatus(status),
     onInviterChange: (id) => setInviter(id),
+    manual: true, // NEW: manual mode
   });
 
   // Play sound when call is ringing or incoming
@@ -52,6 +60,16 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
     }
   }, [realStatus]);
 
+  // Only start signaling/media if user explicitly starts the call/accepts
+  React.useEffect(() => {
+    if (open && allowMediaAccess) {
+      initializeMediaAndSignaling();
+    }
+    // Don't run on close
+    // eslint-disable-next-line
+  }, [open, allowMediaAccess]);
+
+  // The UI: Show a button to initiate the call if not connected
   return (
     <Dialog open={open} onOpenChange={() => { onClose(); cleanup(); }}>
       <DialogContent className="max-w-xl p-0 border-0 rounded-xl overflow-hidden shadow-2xl flex flex-col bg-white animate-scale-in">
@@ -70,12 +88,33 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
           </Button>
         </div>
         <div className="flex flex-col items-center justify-center p-3 gap-3 bg-gray-50 transition-all">
-          <VideoCallRenderer
-            callStatus={realStatus}
-            peers={peers}
-            inviter={realInviter}
-            localVideoRef={localVideoRef}
-          />
+          {allowMediaAccess && ready && (
+            <VideoCallRenderer
+              callStatus={realStatus}
+              peers={peers}
+              inviter={realInviter}
+              localVideoRef={localVideoRef}
+            />
+          )}
+          {/* Prompt to start call */}
+          {!allowMediaAccess && !realStatus && (
+            <div className="flex flex-col items-center gap-3 mt-3">
+              <Video className="h-10 w-10 text-blue-600 mb-2 animate-pulse" />
+              <div className="text-lg font-medium text-gray-700">
+                Ready to start a video call?
+              </div>
+              <Button
+                onClick={() => {
+                  onStartCall?.(); // Tell parent to flip flag and prompt media
+                  setTimeout(() => inviteUsers(), 200); // Slight delay to let media/signaling initialize
+                }}
+                className="bg-blue-600 text-white hover:bg-blue-700"
+              >
+                Start Call &amp; Invite
+              </Button>
+              <div className="text-xs text-gray-400">You will be prompted to grant camera/mic access after pressing.</div>
+            </div>
+          )}
         </div>
         <div className="flex flex-col gap-1 px-6 pb-4 text-center">
           {error && <div className="text-red-700 text-sm font-medium animate-pulse">{error}</div>}
@@ -84,7 +123,7 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
             <div className="text-yellow-800 font-semibold animate-pulse flex flex-col items-center gap-2">
               <span>Incoming call...</span>
               <div className="flex gap-3 justify-center">
-                <Button onClick={acceptCall} className="bg-green-600 text-white hover:bg-green-700">Accept</Button>
+                <Button onClick={() => { onStartCall?.(); setTimeout(() => acceptCall(), 200); }} className="bg-green-600 text-white hover:bg-green-700">Accept</Button>
                 <Button onClick={declineCall} variant="destructive">Decline</Button>
               </div>
             </div>

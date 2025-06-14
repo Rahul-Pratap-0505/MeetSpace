@@ -131,8 +131,14 @@ const ChatPage = () => {
               m.content === optimisticMsg.content
           );
           if (matchIdx === -1) {
-            // Server has not sent this message yet (possibly network lag); keep optimistic
-            updated.push(optimisticMsg);
+            updated.push({
+              ...optimisticMsg,
+              profiles: {
+                id: optimisticMsg.profiles?.id || optimisticMsg.sender_id,
+                username: optimisticMsg.profiles?.username || "You",
+                avatar_url: optimisticMsg.profiles?.avatar_url ?? null,
+              },
+            });
             console.log("Preserving optimistic message on reload:", optimisticMsg);
           } else {
             // Matched; do nothing, server message replaces optimistic
@@ -227,6 +233,7 @@ const ChatPage = () => {
       created_at: new Date().toISOString(),
       room_id: currentRoom,
       profiles: {
+        id: user.id,
         username: user.user_metadata.username || user.email || "You",
         avatar_url: null,
       },
@@ -244,9 +251,6 @@ const ChatPage = () => {
         },
       ]);
       if (error) throw error;
-
-      // No longer remove the optimistic message by timeout;
-      // the realtime "INSERT" event will replace it instead.
 
       if (messages.length === 0) fetchMessages();
     } catch (error: any) {

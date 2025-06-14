@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 
@@ -24,6 +23,7 @@ type UseVideoCallOptions = {
   onError?: (msg: string) => void;
   onStatusChange?: (status: string) => void;
   onInviterChange?: (id: string | null) => void;
+  manual?: boolean; // new prop - if true: do not initialize signaling/media until requested
 };
 
 export const useVideoCall = ({
@@ -33,11 +33,13 @@ export const useVideoCall = ({
   onError,
   onStatusChange,
   onInviterChange,
+  manual = false,
 }: UseVideoCallOptions) => {
-  const [callStatus, setCallStatus] = useState<"idle" | "ringing" | "incoming" | "connecting" | "connected" | "ended">("idle");
+  const [callStatus, setCallStatus] = useState<"idle" | "ringing" | "incoming" | "connecting" | "connected" | "ended" | "">(manual ? "" : "idle");
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
   const [peers, setPeers] = useState<{ [id: string]: PeerInfo }>({});
   const [inviter, setInviter] = useState<string | null>(null);
+  const [ready, setReady] = useState(false); // mark when both signaling & media ready
   const callChannelRef = useRef<any>(null);
   const peerRefs = useRef<{ [id: string]: PeerInfo }>({});
 
@@ -78,7 +80,7 @@ export const useVideoCall = ({
         const msg: GroupSignalData = payload.payload;
         if (msg.sender === userId) return;
         if (!mediaStream) return;
-        if (msg.type === "invite" && callStatus === "idle") {
+        if (msg.type === "invite" && (callStatus === "idle" || callStatus === "")) {
           setInviter(msg.sender);
           setCallStatus("incoming");
         }
@@ -100,6 +102,15 @@ export const useVideoCall = ({
         }
       });
   }, [SIGNAL_CHANNEL, userId, mediaStream, callStatus, onError]);
+
+  // --- Manual trigger logic ---
+  const initializeMediaAndSignaling = useCallback(() => {
+    if (!ready) {
+      startLocalMedia().then(() => {
+        setupSignaling().then(() => setReady(true));
+      });
+    }
+  }, [startLocalMedia, setupSignaling, ready]);
 
   // --- INVITE LOGIC ---
   const inviteUsers = useCallback(async () => {
@@ -242,13 +253,21 @@ export const useVideoCall = ({
     setMediaStream(null);
     if (callChannelRef.current) supabase.removeChannel(callChannelRef.current);
     setInviter(null);
-    setCallStatus("ended");
-  }, [mediaStream]);
+    setReady(false);
+    setCallStatus(manual ? "" : "ended");
+  }, [mediaStream, manual]);
 
-  // -- Automatic start for open
+  // -- Automatic start for open, UNLESS in manual mode
   useEffect(() => {
-    startLocalMedia().then(setupSignaling);
+    if (!manual) {
+      startLocalMedia().then(() => {
+        setupSignaling().then(() => setReady(true));
+      });
+      return cleanup;
+    }
+    // otherwise only run cleanup on unmount
     return cleanup;
+    // eslint-disable-next-line
   }, []);
 
   return {
@@ -260,5 +279,9 @@ export const useVideoCall = ({
     acceptCall,
     declineCall,
     cleanup,
+    ready,
+    initializeMediaAndSignaling,
   };
 };
+
+// Note: This file is now quite long (275+ lines). For maintainability, please consider splitting signaling, media, and peer connection logic into separate hooks/components!

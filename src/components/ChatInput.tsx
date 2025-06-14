@@ -13,6 +13,7 @@ type ChatInputProps = {
 const ChatInput = ({ sendMessage }: ChatInputProps) => {
   const [input, setInput] = useState("");
   const [videoModal, setVideoModal] = useState(false);
+  const [startCall, setStartCall] = useState(false); // Track explicit call start
   const videoCallModalRef = useRef<{ inviteUsers: () => void } | null>(null);
   // Use AuthContext for user and current room
   const { user } = useAuth();
@@ -44,10 +45,6 @@ const ChatInput = ({ sendMessage }: ChatInputProps) => {
           variant="outline"
           onClick={() => {
             setVideoModal(true);
-            setTimeout(() => {
-              // Small wait for modal to mount
-              (document.getElementById("video-call-modal-action-btn") as HTMLButtonElement)?.click?.();
-            }, 300);
           }}
           className={`
             flex justify-center items-center
@@ -74,12 +71,17 @@ const ChatInput = ({ sendMessage }: ChatInputProps) => {
           <Send className="h-4 w-4" />
         </Button>
       </form>
-      {/* Video Call Modal - pass current user's id and current room */}
+      {/* Only start the call when user confirms */}
       <VideoCallModal
         open={videoModal}
-        onClose={() => setVideoModal(false)}
+        onClose={() => {
+          setVideoModal(false);
+          setStartCall(false);
+        }}
         roomId={roomId || ""}
         userId={user?.id || ""}
+        allowMediaAccess={startCall}
+        onStartCall={() => setStartCall(true)}
       />
     </div>
   );
