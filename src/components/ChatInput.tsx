@@ -2,7 +2,10 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send } from "lucide-react";
+import { Send, Video } from "lucide-react";
+import VideoCallModal from "./VideoCallModal";
+import { useAuth } from "@/contexts/AuthContext";
+import { useParams } from "react-router-dom";
 
 type ChatInputProps = {
   sendMessage: (text: string, resetInput: () => void) => void;
@@ -10,6 +13,12 @@ type ChatInputProps = {
 
 const ChatInput = ({ sendMessage }: ChatInputProps) => {
   const [input, setInput] = useState("");
+  const [videoModal, setVideoModal] = useState(false);
+  // Use AuthContext for user and current room
+  const { user } = useAuth();
+  const params = useParams();
+  // fallback to a prop/passed roomId if needed
+  const roomId = params?.roomId || "";
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,6 +40,22 @@ const ChatInput = ({ sendMessage }: ChatInputProps) => {
           autoComplete="off"
         />
         <Button
+          type="button"
+          variant="outline"
+          onClick={() => setVideoModal(true)}
+          className={`
+            flex justify-center items-center
+            border bg-gradient-to-r from-blue-200 to-purple-200
+            hover:from-blue-300 hover:to-purple-300
+            shadow-sm
+            transition-all duration-200
+            animate-bounce
+          `}
+          aria-label="Start Video Call"
+        >
+          <Video className="h-5 w-5 text-blue-600" />
+        </Button>
+        <Button
           type="submit"
           disabled={!input.trim()}
           className={`
@@ -44,6 +69,13 @@ const ChatInput = ({ sendMessage }: ChatInputProps) => {
           <Send className="h-4 w-4" />
         </Button>
       </form>
+      {/* Video Call Modal - pass current user's id and current room */}
+      <VideoCallModal
+        open={videoModal}
+        onClose={() => setVideoModal(false)}
+        roomId={roomId || ""}
+        userId={user?.id || ""}
+      />
     </div>
   );
 };
