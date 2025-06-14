@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -57,7 +58,7 @@ const AppRoutes = () => {
 };
 
 const App = () => (
-  <ThemeProvider attribute="class" defaultTheme="system" enableSystem storageKey="talksphere-theme">
+  <ThemeProvider attribute="class" defaultTheme="system" enableSystem storageKey="meetspace-theme">
     <div className="min-h-screen bg-background transition-colors duration-300">
       <ThemeSwitcher />
       <QueryClientProvider client={queryClient}>
