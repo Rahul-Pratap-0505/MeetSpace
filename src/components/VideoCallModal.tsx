@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const [showPrompt, setShowPrompt] = useState(false);
+  const [previewStarted, setPreviewStarted] = useState(false);
   const {
     callStatus,
     inviteUsers,
@@ -36,6 +38,8 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
     ready,
     mediaLoading,
     initializeMediaAndSignaling,
+    startLocalPreview,
+    stopLocalPreview,
   } = useVideoCall({
     roomId,
     userId,
@@ -52,14 +56,22 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
       setShowPrompt(false);
     }
     setError(null);
-    // CLEANUP: remove auto-calling cleanup here: only explicitly call it on user actions
+    // Start local camera preview as soon as modal opens (not joined)
+    if (open && !previewStarted && !ready) {
+      startLocalPreview && startLocalPreview();
+      setPreviewStarted(true);
+    }
+    if (!open && previewStarted) {
+      stopLocalPreview && stopLocalPreview();
+      setPreviewStarted(false);
+    }
     // eslint-disable-next-line
-  }, [callSession, roomId]);
+  }, [callSession, roomId, open]);
 
   // Helper: is user present in the room now?
   const isUserPresent = presentUsers?.includes?.(userId);
 
-  // Prompt for all present users except the initiator, until declined or accepted
+  // Accept: join call with media/signaling
   const handleAccept = async () => {
     await initializeMediaAndSignaling();
     await acceptCall();
@@ -69,16 +81,9 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
   const handleDeclineOrCut = () => {
     setShowPrompt(false);
     cleanup();
+    setPreviewStarted(false);
     onClose();
   };
-
-  // Remove: do not cleanup on unmount (anyone else leaving will not kill local video)
-  // useEffect(() => {
-  //   return () => {
-  //     cleanup();
-  //   };
-  //   // eslint-disable-next-line
-  // }, []);
 
   return (
     <Dialog open={open && showPrompt && isUserPresent} onOpenChange={handleDeclineOrCut}>
@@ -100,8 +105,22 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
           </Button>
         </div>
         <div className="flex flex-col items-center justify-center p-3 gap-3 bg-gray-50 transition-all">
+          {/* Always show local camera preview on open, before Join */}
           {callStatus === "" && (
             <div className="flex flex-col items-center gap-3 mt-3">
+              <div className="w-52 h-40 bg-gray-200 rounded-lg shadow flex items-center justify-center overflow-hidden ring-2 ring-blue-300 relative mb-2">
+                <video
+                  ref={localVideoRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  className="w-full h-full object-cover"
+                  style={{ background: "#ccc" }}
+                />
+                <span className="absolute bottom-1 left-1 bg-black bg-opacity-30 px-2 rounded text-xs text-white">
+                  You (Preview)
+                </span>
+              </div>
               <Video className="h-10 w-10 text-blue-600 mb-2 animate-pulse" />
               <div className="text-lg font-medium text-gray-700">
                 Ready to join the group video call?
@@ -113,7 +132,9 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
               >
                 {mediaLoading ? "Connecting..." : "Join Call"}
               </Button>
-              <div className="text-xs text-gray-400">You will be prompted to grant camera/mic access after joining.</div>
+              <div className="text-xs text-gray-400">
+                You will be prompted to grant camera/mic access after joining.
+              </div>
             </div>
           )}
           {(callStatus === "connected" || callStatus === "connecting") && ready && (
@@ -140,3 +161,4 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
 };
 
 export default VideoCallModal;
+

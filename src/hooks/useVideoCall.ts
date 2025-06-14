@@ -183,6 +183,55 @@ export const useVideoCall = ({
     console.log("Cleaned up call state");
   }, [mediaStream, manual, localVideoRef]);
 
+  // --- Local preview-only logic (camera only, no signaling) ---
+  const [localPreviewActive, setLocalPreviewActive] = useState(false);
+  const startLocalPreview = useCallback(async () => {
+    // If already previewing or already have a stream, do nothing
+    if (localPreviewActive || mediaStream) return;
+    setMediaLoading(true);
+    try {
+      console.log("Starting local PREVIEW for user:", userId);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 400 } },
+        audio: true,
+      });
+      setMediaStream(stream); // (just like main logic)
+      setLocalPreviewActive(true);
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+        localVideoRef.current.onloadedmetadata = () => {
+          console.log("Local video preview loaded metadata, attempting to play...");
+          localVideoRef.current?.play();
+        };
+      }
+      setMediaLoading(false);
+      console.log("Started local preview for:", userId);
+    } catch (err: any) {
+      setMediaLoading(false);
+      if (err.name === "NotAllowedError") {
+        onError?.("Camera/mic permission denied. Please allow access in your browser (Preview).");
+      } else {
+        onError?.("Could not access camera or microphone (Preview).");
+      }
+      setCallStatus("ended");
+      console.error("Failed to access camera/mic (Preview)", err);
+    }
+  }, [localPreviewActive, localVideoRef, mediaStream, onError, userId]);
+
+  const stopLocalPreview = useCallback(() => {
+    if (!localPreviewActive) return;
+    if (mediaStream) {
+      mediaStream.getTracks().forEach((t) => t.stop());
+    }
+    setMediaStream(null);
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = null;
+    }
+    setLocalPreviewActive(false);
+    setMediaLoading(false);
+    console.log("Stopped local preview for:", userId);
+  }, [localPreviewActive, mediaStream, localVideoRef, userId]);
+
   // --- Media setup ---
   const startLocalMedia = useCallback(async () => {
     setMediaLoading(true);
@@ -267,12 +316,16 @@ export const useVideoCall = ({
   const initializeMediaAndSignaling = useCallback(async () => {
     if (!ready) {
       console.log("Initializing media & signaling for user:", userId);
-      await startLocalMedia();
+      // Do NOT start local preview again if already active.
+      if (!mediaStream) {
+        await startLocalMedia();
+      }
       await setupSignaling();
       setReady(true);
+      setLocalPreviewActive(false); // switch from preview to call
       console.log("Media and signaling ready");
     }
-  }, [ready, startLocalMedia, setupSignaling, userId]);
+  }, [ready, startLocalMedia, setupSignaling, userId, mediaStream]);
 
   // --- INVITE LOGIC ---
   const inviteUsers = useCallback(async () => {
@@ -352,5 +405,7 @@ export const useVideoCall = ({
     ready,
     mediaLoading,
     initializeMediaAndSignaling,
+    startLocalPreview,
+    stopLocalPreview,
   };
 };
