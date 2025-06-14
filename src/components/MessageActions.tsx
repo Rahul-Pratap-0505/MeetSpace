@@ -15,7 +15,29 @@ type MessageActionsProps = {
 const MessageActions = ({ messageId, isOwn, onMessageDeleted }: MessageActionsProps) => {
   const handleDeleteMessage = async () => {
     try {
-      console.log('Deleting message:', messageId)
+      console.log('Attempting to delete message:', messageId)
+      
+      // First, let's check if the message exists and we have permission
+      const { data: messageCheck, error: checkError } = await supabase
+        .from('messages')
+        .select('id, sender_id')
+        .eq('id', messageId)
+        .single()
+
+      if (checkError) {
+        console.error('Error checking message:', checkError)
+        toast.error('Error checking message: ' + checkError.message)
+        return
+      }
+
+      if (!messageCheck) {
+        console.error('Message not found')
+        toast.error('Message not found')
+        return
+      }
+
+      console.log('Message found, proceeding with deletion:', messageCheck)
+
       const { error } = await supabase
         .from('messages')
         .delete()
@@ -23,15 +45,16 @@ const MessageActions = ({ messageId, isOwn, onMessageDeleted }: MessageActionsPr
 
       if (error) {
         console.error('Delete error:', error)
-        throw error
+        toast.error('Error deleting message: ' + error.message)
+        return
       }
 
       console.log('Message deleted successfully')
       toast.success('Message deleted')
       onMessageDeleted()
     } catch (error: any) {
-      console.error('Error deleting message:', error)
-      toast.error('Error deleting message: ' + error.message)
+      console.error('Unexpected error deleting message:', error)
+      toast.error('Unexpected error: ' + error.message)
     }
   }
 
