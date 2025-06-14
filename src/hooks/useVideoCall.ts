@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 
@@ -40,6 +41,7 @@ export const useVideoCall = ({
   const [peers, setPeers] = useState<{ [id: string]: PeerInfo }>({});
   const [inviter, setInviter] = useState<string | null>(null);
   const [ready, setReady] = useState(false); // mark when both signaling & media ready
+  const [mediaLoading, setMediaLoading] = useState(false); // NEW: Track if camera is loading
   const callChannelRef = useRef<any>(null);
   const peerRefs = useRef<{ [id: string]: PeerInfo }>({});
 
@@ -54,23 +56,35 @@ export const useVideoCall = ({
 
   // --- Media setup ---
   const startLocalMedia = useCallback(async () => {
+    setMediaLoading(true);
     try {
+      console.log("Starting local media for user:", userId);
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 640 }, height: { ideal: 400 } },
         audio: true,
       });
       setMediaStream(stream);
+      // set the srcObject even if already set
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
       }
+      setMediaLoading(false);
+      console.log("Got user media for:", userId);
     } catch (err) {
+      setMediaLoading(false);
       onError?.("Could not access camera or microphone.");
       setCallStatus("ended");
+      console.error("Failed to access camera/mic", err);
     }
-  }, [localVideoRef, onError]);
+  }, [localVideoRef, onError, userId]);
 
   // --- Signaling setup ---
   const setupSignaling = useCallback(async () => {
+    console.log("Setting up signaling for", SIGNAL_CHANNEL, "user:", userId);
+    // Clean old channel if exists
+    if (callChannelRef.current) {
+      try { supabase.removeChannel(callChannelRef.current); } catch {}
+    }
     const channel = supabase.channel(SIGNAL_CHANNEL, {
       config: { broadcast: { ack: true } }
     });
@@ -78,8 +92,12 @@ export const useVideoCall = ({
     channel
       .on("broadcast", { event: "groupcall" }, async (payload) => {
         const msg: GroupSignalData = payload.payload;
-        if (msg.sender === userId) return;
-        if (!mediaStream) return;
+        if (msg.sender === userId) return; // Don't process own events
+        if (!mediaStream) {
+          console.log("No local media yet, skipping signaling event", msg);
+          return;
+        }
+        console.log("Signaling event received:", msg, "Current status:", callStatus);
         if (msg.type === "invite" && (callStatus === "idle" || callStatus === "")) {
           setInviter(msg.sender);
           setCallStatus("incoming");
@@ -101,16 +119,18 @@ export const useVideoCall = ({
           callChannelRef.current = channel;
         }
       });
-  }, [SIGNAL_CHANNEL, userId, mediaStream, callStatus, onError]);
+  }, [SIGNAL_CHANNEL, userId, mediaStream, callStatus, onError, connectToPeer, handleSignal]);
 
   // --- Manual trigger logic ---
-  const initializeMediaAndSignaling = useCallback(() => {
+  const initializeMediaAndSignaling = useCallback(async () => {
     if (!ready) {
-      startLocalMedia().then(() => {
-        setupSignaling().then(() => setReady(true));
-      });
+      console.log("Initializing media & signaling for user:", userId);
+      await startLocalMedia();
+      await setupSignaling();
+      setReady(true);
+      console.log("Media and signaling ready");
     }
-  }, [startLocalMedia, setupSignaling, ready]);
+  }, [ready, startLocalMedia, setupSignaling, userId]);
 
   // --- INVITE LOGIC ---
   const inviteUsers = useCallback(async () => {
@@ -124,43 +144,52 @@ export const useVideoCall = ({
         sender: userId,
       },
     });
+    console.log("Sent invite (ringing) from", userId);
   }, [userId]);
 
   // --- Accept/Decline handlers ---
   const acceptCall = useCallback(async () => {
     setCallStatus("connecting");
-    callChannelRef.current?.send({
-      type: "broadcast",
-      event: "groupcall",
-      payload: {
-        type: "accept",
-        sender: userId,
-      },
-    });
+    if (callChannelRef.current) {
+      callChannelRef.current.send({
+        type: "broadcast",
+        event: "groupcall",
+        payload: {
+          type: "accept",
+          sender: userId,
+        },
+      });
+    }
+    console.log("Accepted call, connecting as callee", userId);
     await connectToPeer(inviter!, false);
-  }, [userId, inviter]);
+  }, [userId, inviter, connectToPeer]);
 
   const declineCall = useCallback(() => {
     setCallStatus("ended");
-    callChannelRef.current?.send({
-      type: "broadcast",
-      event: "groupcall",
-      payload: {
-        type: "decline",
-        sender: userId,
-        target: inviter,
-      },
-    });
+    if (callChannelRef.current) {
+      callChannelRef.current.send({
+        type: "broadcast",
+        event: "groupcall",
+        payload: {
+          type: "decline",
+          sender: userId,
+          target: inviter,
+        },
+      });
+    }
     cleanup();
-  }, [userId, inviter]);
+    console.log("Declined call:", userId);
+  }, [userId, inviter, cleanup]);
 
-  // --- PEER CONNECTION MANAGEMENT ---
+  // --- PEER CONNECTION MANAGEMENT --- (add log, same logic)
   const connectToPeer = useCallback(async (peerId: string, isInitiator: boolean) => {
     if (peerRefs.current[peerId]) return;
+    console.log(`Connecting to peer: ${peerId} as ${isInitiator ? "initiator" : "callee"}`);
     const pc = new RTCPeerConnection(RTC_CONFIG);
 
     mediaStream?.getTracks().forEach((track) => pc.addTrack(track, mediaStream));
     const remoteVideo = { current: document.createElement("video") } as React.RefObject<HTMLVideoElement>;
+
     pc.ontrack = (event) => {
       if (remoteVideo.current) {
         remoteVideo.current.srcObject = event.streams[0];
@@ -181,6 +210,7 @@ export const useVideoCall = ({
       }
     };
     pc.onconnectionstatechange = () => {
+      console.log("PeerConnection state:", pc.connectionState);
       if (pc.connectionState === "connected") setCallStatus("connected");
       if (
         pc.connectionState === "failed" ||
@@ -213,13 +243,14 @@ export const useVideoCall = ({
     }
   }, [mediaStream, userId]);
 
-  // --- Handle incoming offer/answer/ICE ---
+  // --- Handle incoming offer/answer/ICE --- (add log, same logic)
   const handleSignal = useCallback(async (peerId: string, msg: GroupSignalData) => {
     if (!peerRefs.current[peerId]) {
       await connectToPeer(peerId, false);
     }
     const pc = peerRefs.current[peerId]?.pc;
     if (!pc) return;
+    console.log("Handling signal from", peerId, msg);
 
     if (msg.sdp) {
       await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp!));
@@ -241,7 +272,9 @@ export const useVideoCall = ({
     if (msg.candidate) {
       try {
         await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
-      } catch (e) {}
+      } catch (e) {
+        console.error("Failed to add ICE candidate", e);
+      }
     }
   }, [connectToPeer, userId]);
 
@@ -249,12 +282,19 @@ export const useVideoCall = ({
   const cleanup = useCallback(() => {
     Object.values(peerRefs.current).forEach(({ pc }) => pc.close());
     setPeers({});
-    mediaStream?.getTracks().forEach((t) => t.stop());
+    if (mediaStream) {
+      mediaStream.getTracks().forEach((t) => t.stop());
+    }
     setMediaStream(null);
-    if (callChannelRef.current) supabase.removeChannel(callChannelRef.current);
+    if (callChannelRef.current) {
+      supabase.removeChannel(callChannelRef.current);
+      callChannelRef.current = null;
+    }
     setInviter(null);
     setReady(false);
     setCallStatus(manual ? "" : "ended");
+    setMediaLoading(false);
+    console.log("Cleaned up call state");
   }, [mediaStream, manual]);
 
   // -- Automatic start for open, UNLESS in manual mode
@@ -270,6 +310,7 @@ export const useVideoCall = ({
     // eslint-disable-next-line
   }, []);
 
+  // Expose mediaLoading to UI
   return {
     callStatus,
     peers,
@@ -280,8 +321,7 @@ export const useVideoCall = ({
     declineCall,
     cleanup,
     ready,
+    mediaLoading,
     initializeMediaAndSignaling,
   };
 };
-
-// Note: This file is now quite long (275+ lines). For maintainability, please consider splitting signaling, media, and peer connection logic into separate hooks/components!
