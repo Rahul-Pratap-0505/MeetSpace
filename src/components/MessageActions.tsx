@@ -3,7 +3,7 @@ import React from 'react'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Trash2 } from 'lucide-react'
+import { Trash2, MoreVertical } from 'lucide-react'
 import { toast } from 'sonner'
 
 type MessageActionsProps = {
@@ -15,16 +15,22 @@ type MessageActionsProps = {
 const MessageActions = ({ messageId, isOwn, onMessageDeleted }: MessageActionsProps) => {
   const handleDeleteMessage = async () => {
     try {
+      console.log('Deleting message:', messageId)
       const { error } = await supabase
         .from('messages')
         .delete()
         .eq('id', messageId)
 
-      if (error) throw error
+      if (error) {
+        console.error('Delete error:', error)
+        throw error
+      }
 
+      console.log('Message deleted successfully')
       toast.success('Message deleted')
       onMessageDeleted()
     } catch (error: any) {
+      console.error('Error deleting message:', error)
       toast.error('Error deleting message: ' + error.message)
     }
   }
@@ -36,9 +42,7 @@ const MessageActions = ({ messageId, isOwn, onMessageDeleted }: MessageActionsPr
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100">
           <span className="sr-only">Message options</span>
-          <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
-          <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
-          <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+          <MoreVertical className="h-3 w-3" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

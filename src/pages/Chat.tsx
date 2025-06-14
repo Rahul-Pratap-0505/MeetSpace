@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { Send, LogOut, MessageCircle, Users } from 'lucide-react'
 import CreateRoomDialog from '@/components/CreateRoomDialog'
 import MessageActions from '@/components/MessageActions'
+import RoomActions from '@/components/RoomActions'
 
 type Message = {
   id: string
@@ -75,7 +76,7 @@ const Chat = () => {
       if (error) throw error
 
       setRooms(data || [])
-      if (data && data.length > 0) {
+      if (data && data.length > 0 && !currentRoom) {
         setCurrentRoom(data[0].id)
       }
     } catch (error: any) {
@@ -154,6 +155,18 @@ const Chat = () => {
           }
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'messages',
+          filter: `room_id=eq.${currentRoom}`,
+        },
+        (payload) => {
+          setMessages((prev) => prev.filter(msg => msg.id !== payload.old.id))
+        }
+      )
       .subscribe()
 
     // Store reference to the channel
@@ -205,7 +218,25 @@ const Chat = () => {
   }
 
   const handleMessageDeleted = () => {
-    fetchMessages()
+    // Messages will be updated through real-time subscription
+    console.log('Message deleted, real-time update will handle UI refresh')
+  }
+
+  const handleRoomDeleted = () => {
+    fetchRooms()
+    // If the current room was deleted, switch to the first available room
+    if (rooms.length > 1) {
+      const remainingRooms = rooms.filter(room => room.id !== currentRoom)
+      if (remainingRooms.length > 0) {
+        setCurrentRoom(remainingRooms[0].id)
+      } else {
+        setCurrentRoom('')
+        setMessages([])
+      }
+    } else {
+      setCurrentRoom('')
+      setMessages([])
+    }
   }
 
   if (loading) {
@@ -260,16 +291,18 @@ const Chat = () => {
             
             <div className="space-y-1 mt-3">
               {rooms.map((room) => (
-                <button
+                <div
                   key={room.id}
-                  onClick={() => setCurrentRoom(room.id)}
-                  className={`w-full text-left p-3 rounded-lg transition-colors ${
+                  className={`group flex items-center justify-between p-3 rounded-lg transition-colors ${
                     currentRoom === room.id
                       ? 'bg-blue-100 text-blue-700'
                       : 'hover:bg-gray-100 text-gray-700'
                   }`}
                 >
-                  <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => setCurrentRoom(room.id)}
+                    className="flex-1 text-left flex items-center space-x-3"
+                  >
                     <div className={`w-8 h-8 bg-gradient-to-r ${generateRoomAvatar(room.name)} rounded-full flex items-center justify-center`}>
                       <span className="text-white font-medium text-sm">
                         {room.name.charAt(0).toUpperCase()}
@@ -281,8 +314,13 @@ const Chat = () => {
                         Created {new Date(room.created_at).toLocaleDateString()}
                       </div>
                     </div>
-                  </div>
-                </button>
+                  </button>
+                  <RoomActions 
+                    roomId={room.id} 
+                    roomName={room.name}
+                    onRoomDeleted={handleRoomDeleted}
+                  />
+                </div>
               ))}
             </div>
           </div>
