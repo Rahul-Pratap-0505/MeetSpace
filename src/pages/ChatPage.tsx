@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
@@ -36,11 +36,15 @@ const ChatPage = () => {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [currentRoom, setCurrentRoom] = useState("");
   const isMobile = useIsMobile();
-  const [sidebarOpen, setSidebarOpen] = useReactState(!isMobile);
+  const [sidebarOpen, setSidebarOpen] = useState(!isMobile); // Use only useState, not useReactState
 
+  // Memoize Sidebar to avoid re-creation on every render
+  const MemoSidebar = useMemo(() => React.memo(ChatSidebar), []);
+
+  // Only auto-close/open sidebar when changing device (not every render)
   useEffect(() => {
     setSidebarOpen(!isMobile);
-  }, [isMobile]); // Only depend on isMobile
+  }, [isMobile]);
 
   useEffect(() => {
     fetchRooms();
@@ -65,16 +69,16 @@ const ChatPage = () => {
     }
   };
 
-  const { 
+  const {
     messages,
     loading,
-    sendMessage, 
+    sendMessage,
     fetchMessages,
-    setMessages 
+    setMessages
   } = useChatMessages({ currentRoom, user });
 
-  const { 
-    presentUsers, 
+  const {
+    presentUsers,
     typingUsers,
     handleTypingStart,
     handleTypingStop
@@ -94,6 +98,7 @@ const ChatPage = () => {
       toast.error("Error signing out: " + error.message);
     }
   };
+
   const handleRoomDeleted = () => {
     fetchRooms();
     if (rooms.length > 1) {
@@ -124,49 +129,42 @@ const ChatPage = () => {
     return colors[colorIndex];
   };
 
-  // Memoize ChatSidebar to prevent unnecessary re-renders
-  const MemoSidebar = React.useMemo(() => React.memo(ChatSidebar), []);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50">
-        <div className="text-center animate-fade-in">
-          <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
-            <div className="w-8 h-8 bg-white rounded-full"></div>
-          </div>
-          <p className="text-gray-600">Loading chat...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex w-full transition-colors duration-700">
       {isMobile && (
         <>
-          <button
-            className="fixed z-30 top-4 left-4 bg-white shadow-lg p-2 rounded-full flex items-center justify-center transition-transform duration-200 hover:scale-110 focus-visible:ring-2 focus-visible:ring-blue-500"
-            aria-label="Open sidebar"
-            onClick={() => setSidebarOpen(true)}
-            style={{ display: sidebarOpen ? "none" : "flex" }}
-          >
-            <Menu className="text-blue-600" />
-          </button>
+          {/* Floating menu button—only shown when sidebar is closed */}
+          {!sidebarOpen && (
+            <button
+              className="fixed z-30 top-4 left-4 bg-white shadow-lg p-2 rounded-full flex items-center justify-center transition-transform duration-200 hover:scale-110 focus-visible:ring-2 focus-visible:ring-blue-500"
+              aria-label="Open sidebar"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <Menu className="text-blue-600" />
+            </button>
+          )}
+          {/* Sidebar overlay—persistent, controlled by sidebarOpen */}
           <div
-            className={`fixed inset-0 bg-black/30 z-20 backdrop-blur-sm transition-opacity duration-200 ${sidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
+            className={`
+              fixed inset-0 z-20 bg-black/30
+              backdrop-blur-sm transition-opacity duration-300
+              ${sidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}
+            `}
             onClick={() => setSidebarOpen(false)}
+            aria-label="Sidebar overlay"
+            style={{ touchAction: "none" }}
           />
         </>
       )}
 
+      {/* Sidebar (always mounted, transitions handled by translate-x) */}
       <div
         className={`
           z-30
           ${isMobile
-            ? `fixed top-0 left-0 h-full transition-transform duration-300 bg-white/90 backdrop-blur-lg 
-                shadow-xl w-64
+            ? `fixed top-0 left-0 h-full transition-transform duration-300 bg-white/90 backdrop-blur-lg shadow-xl w-64
                 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
-                `
+              `
             : "relative w-80"}
           animate-fade-in
         `}
@@ -178,8 +176,7 @@ const ChatPage = () => {
           currentRoom={currentRoom}
           setCurrentRoom={(id) => {
             setCurrentRoom(id);
-            // Only close sidebar on mobile if manually desired, not on every room change
-            // setSidebarOpen(false); // Remove this to prevent sidebar flicker
+            // Only close sidebar manually now
           }}
           handleSignOut={handleSignOut}
           fetchRooms={fetchRooms}
@@ -189,12 +186,15 @@ const ChatPage = () => {
           closeSidebar={() => setSidebarOpen(false)}
         />
       </div>
+
+      {/* Main content blur only when overlay open */}
       <div
         className={`
           flex-1 flex flex-col min-h-screen transition-all duration-500
           ${isMobile && sidebarOpen ? "pointer-events-none blur-sm scale-95" : ""}
         `}
       >
+        {/* Only show loading inside ChatMessages, not as a full overlay */}
         <ChatMessages
           messages={messages}
           userId={user?.id}
@@ -204,6 +204,7 @@ const ChatPage = () => {
           handleMessageDeleted={handleMessageDeleted}
           typingUserIds={typingUsers}
           presentUsers={presentUsers}
+          loading={loading}
         />
         <ChatInput
           sendMessage={sendMessage}
