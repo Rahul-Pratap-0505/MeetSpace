@@ -1,12 +1,12 @@
+
 import React, { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Video, Paperclip, X } from "lucide-react";
-import VideoCallModal from "./VideoCallModal";
+import { Paperclip, Send } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useParams } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
-import { toast } from "sonner";
+import { useFileUpload } from "@/hooks/useFileUpload";
+import SelectedFilePreview from "./SelectedFilePreview";
 
 type ChatInputProps = {
   sendMessage: (
@@ -31,11 +31,15 @@ const ChatInput = ({
   const params = useParams();
   const roomId = params?.roomId || "";
 
-  // New: For files/images
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const {
+    selectedFile,
+    setSelectedFile,
+    uploading,
+    fileInputRef,
+    handleFileChange,
+    removeSelectedFile,
+    uploadFile,
+  } = useFileUpload();
 
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -47,26 +51,10 @@ const ChatInput = ({
     let fileType: string | undefined = undefined;
 
     if (selectedFile) {
-      setUploading(true);
-      const ext = selectedFile.name.split(".").pop();
-      const filename = `${Date.now()}-${Math.random().toString(36).substring(2)}.${ext}`;
-      const { data, error } = await supabase.storage
-        .from("chat-files")
-        .upload(filename, selectedFile, {
-          cacheControl: "3600",
-          upsert: false,
-        });
-
-      setUploading(false);
-
-      if (error) {
-        toast.error("Failed to upload file: " + error.message);
-        return;
-      }
-
-      // Public URL of the uploaded file
-      fileUrl = supabase.storage.from("chat-files").getPublicUrl(filename).data.publicUrl;
-      fileType = selectedFile.type;
+      const { fileUrl: url, fileType: type, error } = await uploadFile();
+      if (error) return; // error handled in the hook
+      fileUrl = url;
+      fileType = type;
     }
 
     sendMessage(input, () => setInput(""), fileUrl, fileType);
@@ -87,13 +75,6 @@ const ChatInput = ({
   const handleBlur = () => {
     if (onTypingStop) onTypingStop();
   };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) setSelectedFile(file);
-  };
-
-  const removeSelectedFile = () => setSelectedFile(null);
 
   return (
     <div className="bg-white/80 dark:bg-muted/80 backdrop-blur-sm border-t border-gray-200 dark:border-border p-4 transition-shadow duration-150">
@@ -151,15 +132,9 @@ const ChatInput = ({
           tabIndex={-1}
         />
       </form>
-
       {/* Preview selected file */}
       {selectedFile && (
-        <div className="mt-2 flex items-center bg-gray-100 rounded p-2 space-x-2">
-          <span className="text-sm truncate max-w-[160px]">{selectedFile.name}</span>
-          <Button type="button" size="icon" variant="ghost" onClick={removeSelectedFile}>
-            <X size={16} />
-          </Button>
-        </div>
+        <SelectedFilePreview file={selectedFile} onRemove={removeSelectedFile} />
       )}
     </div>
   );
