@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -53,7 +52,7 @@ const ChatMessages = ({
   return (
     <>
       {/* Chat Header */}
-      <div className="bg-white/80 dark:bg-background/80 backdrop-blur-sm border-b border-gray-200 dark:border-border p-4">
+      <div className="bg-white/80 dark:bg-muted/70 backdrop-blur-sm border-b border-gray-200 dark:border-border p-4 transition-colors duration-200">
         <div className="flex items-center space-x-3">
           {!!currentRoom && (
             <>
@@ -70,7 +69,7 @@ const ChatMessages = ({
                 <h2 className="font-semibold text-gray-900 dark:text-foreground">
                   {rooms.find((r) => r.id === currentRoom)?.name || "Select a room"}
                 </h2>
-                <p className="text-sm text-gray-500">{messages.length} messages</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{messages.length} messages</p>
               </div>
             </>
           )}
