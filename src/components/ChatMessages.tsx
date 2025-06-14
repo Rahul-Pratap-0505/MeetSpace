@@ -52,7 +52,7 @@ const ChatMessages = ({
   return (
     <>
       {/* Chat Header */}
-      <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200 p-4">
+      <div className="bg-white/80 dark:bg-background/80 backdrop-blur-sm border-b border-gray-200 dark:border-border p-4">
         <div className="flex items-center space-x-3">
           {!!currentRoom && (
             <>
@@ -101,7 +101,7 @@ const ChatMessages = ({
                       className={`px-3 py-2 rounded-lg relative break-words transition-transform duration-150 shadow-sm ${
                         isOwn
                           ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white animate-scale-in"
-                          : "bg-white shadow-sm border animate-fade-in"
+                          : "bg-white dark:bg-muted text-foreground shadow-sm border animate-fade-in"
                       }`}
                     >
                       <p className="text-sm">{message.content}</p>
@@ -115,7 +115,7 @@ const ChatMessages = ({
                         </div>
                       )}
                     </div>
-                    <div className={`text-xs text-gray-500 mt-1 ${isOwn ? "text-right" : ""}`}>
+                    <div className={`text-xs text-gray-500 dark:text-gray-400 mt-1 ${isOwn ? "text-right" : ""}`}>
                       <span className="font-medium">{message.profiles?.username || "Unknown"}</span>
                       <span className="ml-2">{new Date(message.created_at).toLocaleTimeString()}</span>
                     </div>
