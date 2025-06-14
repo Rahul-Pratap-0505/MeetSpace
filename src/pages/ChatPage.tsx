@@ -40,7 +40,7 @@ const ChatPage = () => {
 
   useEffect(() => {
     setSidebarOpen(!isMobile);
-  }, [isMobile]); // Only depend on isMobile to fix flicker
+  }, [isMobile]); // Only depend on isMobile
 
   useEffect(() => {
     fetchRooms();
@@ -62,8 +62,6 @@ const ChatPage = () => {
       }
     } catch (error: any) {
       toast.error("Error fetching rooms: " + error.message);
-    } finally {
-      // setLoading(false); // Loading is now handled by the useChatMessages hook
     }
   };
 
@@ -126,6 +124,9 @@ const ChatPage = () => {
     return colors[colorIndex];
   };
 
+  // Memoize ChatSidebar to prevent unnecessary re-renders
+  const MemoSidebar = React.useMemo(() => React.memo(ChatSidebar), []);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50">
@@ -171,13 +172,14 @@ const ChatPage = () => {
         `}
         style={isMobile ? { minHeight: "100vh" } : undefined}
       >
-        <ChatSidebar
+        <MemoSidebar
           user={user}
           rooms={rooms}
           currentRoom={currentRoom}
           setCurrentRoom={(id) => {
             setCurrentRoom(id);
-            setSidebarOpen(false);
+            // Only close sidebar on mobile if manually desired, not on every room change
+            // setSidebarOpen(false); // Remove this to prevent sidebar flicker
           }}
           handleSignOut={handleSignOut}
           fetchRooms={fetchRooms}
