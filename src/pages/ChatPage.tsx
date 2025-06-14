@@ -70,12 +70,12 @@ const ChatPage = () => {
     }
   };
 
-  const { 
+  const {
     messages,
     loading,
-    sendMessage, 
+    sendMessage,
     fetchMessages,
-    setMessages 
+    setMessages,
   } = useChatMessages({ currentRoom, user });
 
   const { 

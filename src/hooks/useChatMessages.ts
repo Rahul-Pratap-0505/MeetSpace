@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
@@ -14,6 +13,8 @@ type Message = {
     username: string;
     avatar_url: string | null;
   } | null;
+  file_url?: string | null;
+  file_type?: string | null;
 };
 
 type Room = {
@@ -45,7 +46,9 @@ export function useChatMessages({ currentRoom, user }: UseChatMessagesProps) {
 
       if (messagesError) throw messagesError;
 
-      const senderIds = [...new Set(messagesData?.map((m) => m.sender_id) || [])];
+      const senderIds = [
+        ...new Set(messagesData?.map((m) => m.sender_id) || []),
+      ];
       const { data: profilesData, error: profilesError } = await supabase
         .from("profiles")
         .select("id, username, avatar_url")
@@ -85,7 +88,10 @@ export function useChatMessages({ currentRoom, user }: UseChatMessagesProps) {
             });
           }
         });
-        updated.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        updated.sort(
+          (a, b) =>
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
         return updated;
       });
     } catch (err: any) {
@@ -167,15 +173,20 @@ export function useChatMessages({ currentRoom, user }: UseChatMessagesProps) {
     };
   }, [fetchMessages, subscribeToMessages]);
 
-  // Sending a message with optimistic update
-  const sendMessage = async (text: string, resetInput: () => void) => {
-    if (!text.trim() || !currentRoom || !user) return;
+  // Sending a message with optimistic update (now supports file URL/type)
+  const sendMessage = async (
+    text: string,
+    resetInput: () => void,
+    fileUrl?: string,
+    fileType?: string
+  ) => {
+    if ((!text.trim() && !fileUrl) || !currentRoom || !user) return;
 
     const optimisticId = `optimistic-${Date.now()}`;
-    const optimisticMessage = {
+    const optimisticMessage: Message = {
       id: optimisticId,
       sender_id: user.id,
-      content: text.trim(),
+      content: text.trim() || (fileType?.startsWith("image/") ? "[Image]" : "[File]"),
       created_at: new Date().toISOString(),
       room_id: currentRoom,
       profiles: {
@@ -183,6 +194,9 @@ export function useChatMessages({ currentRoom, user }: UseChatMessagesProps) {
         username: user.user_metadata.username || user.email || "You",
         avatar_url: null,
       },
+      // New
+      file_url: fileUrl || null,
+      file_type: fileType || null,
     };
 
     setMessages((prev) => [...prev, optimisticMessage]);
@@ -194,6 +208,8 @@ export function useChatMessages({ currentRoom, user }: UseChatMessagesProps) {
           content: optimisticMessage.content,
           sender_id: user.id,
           room_id: currentRoom,
+          file_url: fileUrl || null,
+          file_type: fileType || null,
         },
       ]);
       if (error) throw error;
@@ -209,6 +225,6 @@ export function useChatMessages({ currentRoom, user }: UseChatMessagesProps) {
     loading,
     sendMessage,
     fetchMessages,
-    setMessages
+    setMessages,
   };
 }

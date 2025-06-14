@@ -13,6 +13,8 @@ type Message = {
     username: string;
     avatar_url: string | null;
   } | null;
+  file_url?: string | null;
+  file_type?: string | null;
 };
 
 type Room = {
@@ -53,17 +55,38 @@ const ChatMessages = ({
   // Responsive minimum height for scroll area
   const scrollAreaMinHeight = "min-h-[250px] sm:min-h-[350px]";
 
-  // Who is typing? Filter IDs to display names, exclude self
+  // Typing indicator logic unchanged
   let typingDisplay = null;
   if (typingUserIds.length) {
-    // Try to show usernames if possible from presentUsers
-    // Map IDs to "Someone" if can't resolve a username (you may want to improve this if you have a mapping)
-    // Since we have no profiles lookup for presentUsers here, just show generic message
     typingDisplay =
       typingUserIds.length === 1
         ? `Someone is typing...`
         : `Several people are typing...`;
   }
+
+  const renderFile = (file_url?: string | null, file_type?: string | null) => {
+    if (!file_url || !file_type) return null;
+    if (file_type.startsWith("image/")) {
+      return (
+        <img
+          src={file_url}
+          alt="Image"
+          className="max-w-[240px] max-h-[200px] rounded shadow border mb-1"
+        />
+      );
+    }
+    // Other files (make it downloadable)
+    return (
+      <a
+        href={file_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block mt-1 text-blue-600 underline hover:text-blue-800 text-sm"
+      >
+        Download file
+      </a>
+    );
+  };
 
   return (
     <>
@@ -96,9 +119,8 @@ const ChatMessages = ({
         <div className="space-y-4">
           {messages.map((message, idx) => {
             const isOwn = message.sender_id === userId;
-            // Apply entry animation to new messages (last entered)
             const animClass =
-              idx >= messages.length - 3 ? ANIMATE_NEW_CLASS : ""; // Animate only last 3 for smoothness
+              idx >= messages.length - 3 ? ANIMATE_NEW_CLASS : "";
 
             return (
               <div
@@ -123,6 +145,11 @@ const ChatMessages = ({
                         ${!isOwn ? "hover:dark:bg-muted/80 focus:dark:bg-muted/70 transition" : ""}
                       `}
                     >
+                      {message.file_url && message.file_type
+                        ? (
+                            <>{renderFile(message.file_url, message.file_type)}</>
+                          )
+                        : null}
                       <p className="text-sm">{message.content}</p>
                       {isOwn && (
                         <div className="absolute -top-2 -right-2">
