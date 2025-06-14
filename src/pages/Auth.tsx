@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
@@ -42,17 +43,23 @@ const Auth = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4 transition-colors dark:bg-gradient-to-br dark:from-[#1e2334] dark:via-[#10192c] dark:to-[#3a234b]">
-      <Card className="w-full max-w-md shadow-xl border-0 bg-white/80 transition-colors backdrop-blur-sm dark:bg-[#191b23]/80">
+    <div className="min-h-screen flex items-center justify-center transition-colors p-4 
+      bg-background 
+      dark:bg-background 
+      ">
+      <Card className="w-full max-w-md shadow-xl border-0 bg-card/90 transition-colors backdrop-blur-sm">
         <CardHeader className="text-center space-y-4">
-          <div className="mx-auto w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-            <MessageCircle className="h-8 w-8 text-white" />
+          <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center"
+               style={{
+                background: 'linear-gradient(to right, #3b82f6, #a21caf)' // blue-500 to purple-600
+               }}>
+            <MessageCircle className="h-8 w-8 text-primary-foreground" />
           </div>
           <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             {/* PROJECT NAME HERE */}
             {isLogin ? 'Welcome Back to TalkSphere' : 'Create your TalkSphere account'}
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-muted-foreground">
             {isLogin ? 'Sign in to continue chatting' : 'Join TalkSphere and start connecting'}
           </CardDescription>
         </CardHeader>
@@ -60,42 +67,42 @@ const Auth = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <div className="relative">
-                <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="text"
                   placeholder="Username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   required
-                  className="pl-10"
+                  className="pl-10 text-foreground bg-background"
                 />
               </div>
             )}
             <div className="relative">
-              <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
                 type="email"
                 placeholder="Email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="pl-10"
+                className="pl-10 text-foreground bg-background"
               />
             </div>
             <div className="relative">
-              <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
                 type="password"
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="pl-10"
+                className="pl-10 text-foreground bg-background"
               />
             </div>
             <Button 
               type="submit" 
-              className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 transition-all duration-200"
+              className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-primary-foreground transition-all duration-200"
               disabled={loading}
             >
               {loading ? 'Loading...' : isLogin ? 'Sign In' : 'Sign Up'}
@@ -107,7 +114,7 @@ const Auth = () => {
               <span className="w-full border-t" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-muted-foreground">Or continue with</span>
+              <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
             </div>
           </div>
 
@@ -115,7 +122,7 @@ const Auth = () => {
             type="button"
             variant="outline"
             onClick={handleGoogleSignIn}
-            className="w-full"
+            className="w-full text-foreground bg-background"
           >
             <Chrome className="mr-2 h-4 w-4" />
             Google
@@ -125,7 +132,7 @@ const Auth = () => {
             <button
               type="button"
               onClick={() => setIsLogin(!isLogin)}
-              className="text-sm text-blue-600 hover:text-blue-500 transition-colors"
+              className="text-sm text-primary hover:underline transition-colors"
             >
               {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
             </button>
