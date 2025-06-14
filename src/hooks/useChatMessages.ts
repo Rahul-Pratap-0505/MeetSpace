@@ -59,6 +59,8 @@ export function useChatMessages({ currentRoom, user }: UseChatMessagesProps) {
       let messagesWithProfiles =
         messagesData?.map((message) => ({
           ...message,
+          file_url: message.file_url ?? null,
+          file_type: message.file_type ?? null,
           profiles:
             profilesData?.find((profile) => profile.id === message.sender_id) || {
               id: message.sender_id,
@@ -80,6 +82,8 @@ export function useChatMessages({ currentRoom, user }: UseChatMessagesProps) {
           if (matchIdx === -1) {
             updated.push({
               ...optimisticMsg,
+              file_url: optimisticMsg.file_url ?? null,
+              file_type: optimisticMsg.file_type ?? null,
               profiles: {
                 id: optimisticMsg.profiles?.id || optimisticMsg.sender_id,
                 username: optimisticMsg.profiles?.username || "You",
@@ -194,9 +198,9 @@ export function useChatMessages({ currentRoom, user }: UseChatMessagesProps) {
         username: user.user_metadata.username || user.email || "You",
         avatar_url: null,
       },
-      // New
-      file_url: fileUrl || null,
-      file_type: fileType || null,
+      // Ensure these fields are present for type compatibility
+      file_url: typeof fileUrl === "string" ? fileUrl : null,
+      file_type: typeof fileType === "string" ? fileType : null,
     };
 
     setMessages((prev) => [...prev, optimisticMessage]);
@@ -208,8 +212,8 @@ export function useChatMessages({ currentRoom, user }: UseChatMessagesProps) {
           content: optimisticMessage.content,
           sender_id: user.id,
           room_id: currentRoom,
-          file_url: fileUrl || null,
-          file_type: fileType || null,
+          file_url: optimisticMessage.file_url,
+          file_type: optimisticMessage.file_type,
         },
       ]);
       if (error) throw error;
