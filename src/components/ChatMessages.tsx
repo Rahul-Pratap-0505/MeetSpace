@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -28,7 +27,7 @@ export type ChatMessagesProps = {
   rooms: Room[];
   currentRoom: string;
   generateRoomAvatar: (name: string) => string;
-  handleMessageDeleted: () => void;
+  handleMessageDeleted: (messageId: string) => void;
   typingUserIds?: string[];
   presentUsers?: string[];
 };
@@ -130,7 +129,7 @@ const ChatMessages = ({
                           <MessageActions
                             messageId={message.id}
                             isOwn={isOwn}
-                            onMessageDeleted={handleMessageDeleted}
+                            onMessageDeleted={() => handleMessageDeleted(message.id)}
                           />
                         </div>
                       )}

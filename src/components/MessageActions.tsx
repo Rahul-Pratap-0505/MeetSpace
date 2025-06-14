@@ -1,4 +1,3 @@
-
 import React from 'react'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
@@ -9,7 +8,7 @@ import { toast } from 'sonner'
 type MessageActionsProps = {
   messageId: string
   isOwn: boolean
-  onMessageDeleted: () => void
+  onMessageDeleted: (id: string) => void
 }
 
 const MessageActions = ({ messageId, isOwn, onMessageDeleted }: MessageActionsProps) => {
@@ -51,7 +50,7 @@ const MessageActions = ({ messageId, isOwn, onMessageDeleted }: MessageActionsPr
 
       console.log('Message deleted successfully')
       toast.success('Message deleted')
-      onMessageDeleted()
+      onMessageDeleted(messageId)
     } catch (error: any) {
       console.error('Unexpected error deleting message:', error)
       toast.error('Unexpected error: ' + error.message)

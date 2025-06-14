@@ -117,7 +117,10 @@ const ChatPage = () => {
       setMessages([]);
     }
   };
-  const handleMessageDeleted = () => {};
+  // Optimistically remove message from the local list for instant UI feedback
+  const handleMessageDeleted = (messageId: string) => {
+    setMessages((prev: any[]) => prev.filter(msg => msg.id !== messageId));
+  };
 
   const generateRoomAvatar = (roomName: string) => {
     const colors = [
