@@ -1,5 +1,4 @@
-
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send, Video } from "lucide-react";
@@ -14,6 +13,7 @@ type ChatInputProps = {
 const ChatInput = ({ sendMessage }: ChatInputProps) => {
   const [input, setInput] = useState("");
   const [videoModal, setVideoModal] = useState(false);
+  const videoCallModalRef = useRef<{ inviteUsers: () => void } | null>(null);
   // Use AuthContext for user and current room
   const { user } = useAuth();
   const params = useParams();
@@ -42,14 +42,19 @@ const ChatInput = ({ sendMessage }: ChatInputProps) => {
         <Button
           type="button"
           variant="outline"
-          onClick={() => setVideoModal(true)}
+          onClick={() => {
+            setVideoModal(true);
+            setTimeout(() => {
+              // Small wait for modal to mount
+              (document.getElementById("video-call-modal-action-btn") as HTMLButtonElement)?.click?.();
+            }, 300);
+          }}
           className={`
             flex justify-center items-center
             border bg-gradient-to-r from-blue-200 to-purple-200
             hover:from-blue-300 hover:to-purple-300
             shadow-sm
             transition-all duration-200
-            animate-bounce
           `}
           aria-label="Start Video Call"
         >

@@ -18,10 +18,19 @@ type VideoCallModalProps = {
   userId: string;
 };
 
-type SignalData = {
-  sdp?: any;
-  candidate?: any;
+type GroupSignalData = {
+  type: "invite" | "accept" | "decline" | "signal";
   sender: string;
+  sdp?: RTCSessionDescriptionInit;
+  candidate?: RTCIceCandidateInit;
+  target?: string;
+};
+
+type PeerInfo = {
+  id: string;
+  pc: RTCPeerConnection;
+  stream?: MediaStream;
+  remoteVideoRef: React.RefObject<HTMLVideoElement>;
 };
 
 const VideoCallModal: React.FC<VideoCallModalProps> = ({
@@ -30,42 +39,46 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
   roomId,
   userId,
 }) => {
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
-
-  const [callStatus, setCallStatus] = useState<"idle" | "connecting" | "connected" | "ended">("idle");
+  const [callStatus, setCallStatus] = useState<"idle" | "ringing" | "incoming" | "connecting" | "connected" | "ended">("idle");
   const [error, setError] = useState<string | null>(null);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
-  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [peers, setPeers] = useState<{ [id: string]: PeerInfo }>({});
+  const [inviter, setInviter] = useState<string | null>(null); // Who is calling you?
+  const [acceptVisible, setAcceptVisible] = useState(false);
 
-  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
-  const signalChannelRef = useRef<any>(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const callChannelRef = useRef<any>(null);
+  const peerRefs = useRef<{ [id: string]: PeerInfo }>({}); // for stable refs
 
-  // Make sure to only allow 2 participants for demo
+  // Call sound
+  const ringingAudio = useRef<HTMLAudioElement>(null);
+
   const SIGNAL_CHANNEL = `video-signal-${roomId}`;
 
-  // --- WebRTC config ---
   const RTC_CONFIG = {
-    iceServers: [
-      { urls: "stun:stun.l.google.com:19302" }
-    ]
+    iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
   };
 
+  // --- SETUP & CLEANUP ---
   useEffect(() => {
     if (open) {
-      setCallStatus("connecting");
-      startLocalMedia().then(() => {
-        createOrJoin();
-      });
+      startLocalMedia().then(() => setupSignaling());
     }
-
-    return () => {
-      cleanup();
-    };
+    return () => cleanup();
     // eslint-disable-next-line
   }, [open]);
 
-  // Setup local media
+  // Play sound when call is ringing
+  useEffect(() => {
+    if (callStatus === "incoming" && ringingAudio.current) {
+      ringingAudio.current.play();
+    } else if (ringingAudio.current) {
+      ringingAudio.current.pause();
+      ringingAudio.current.currentTime = 0;
+    }
+  }, [callStatus]);
+
+  // --- Media setup ---
   const startLocalMedia = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -82,132 +95,246 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
     }
   };
 
-  const cleanup = () => {
-    peerConnectionRef.current?.close();
-    mediaStream?.getTracks().forEach((track) => track.stop());
-    setRemoteStream(null);
-    setMediaStream(null);
-
-    if (signalChannelRef.current)
-      supabase.removeChannel(signalChannelRef.current);
-    setCallStatus("ended");
-    setError(null);
-  };
-
-  // Set up signaling channel and handle WebRTC
-  const createOrJoin = async () => {
-    // Only one channel per room
+  // --- Signaling setup (Supabase realtime channel) ---
+  const setupSignaling = async () => {
     const channel = supabase.channel(SIGNAL_CHANNEL, {
-      config: { broadcast: { ack: true } },
+      config: { broadcast: { ack: true } }
     });
 
     channel
-      .on("broadcast", { event: "signal" }, async (payload) => {
-        const { sdp, candidate, sender } = payload.payload as SignalData;
-        // Ignore self-sent
-        if (sender === userId) return;
-        // Lazy create peer connect if doesn't exist
-        if (!peerConnectionRef.current) {
-          await createPeerConnection(false);
+      .on("broadcast", { event: "groupcall" }, async (payload) => {
+        const msg: GroupSignalData = payload.payload;
+        if (msg.sender === userId) return; // Don't handle self-sent
+        if (!mediaStream) return;
+
+        if (msg.type === "invite" && callStatus === "idle") {
+          setInviter(msg.sender);
+          setCallStatus("incoming");
+          setAcceptVisible(true);
         }
 
-        // If offer received, set as remote and answer
-        if (sdp) {
-          await peerConnectionRef.current!.setRemoteDescription(
-            new RTCSessionDescription(sdp)
-          );
-          if (sdp.type === "offer") {
-            const answer = await peerConnectionRef.current!.createAnswer();
-            await peerConnectionRef.current!.setLocalDescription(answer);
-            // Send answer
-            channel.send({
-              type: "broadcast",
-              event: "signal",
-              payload: { sdp: answer, sender: userId },
-            });
-          }
+        if (msg.type === "decline" && callStatus === "ringing") {
+          setCallStatus("ended");
+          setError("User declined.");
         }
-        // If ICE candidate received, add to pc
-        if (candidate) {
-          try {
-            await peerConnectionRef.current!.addIceCandidate(candidate);
-          } catch (e) {
-            // Ignore duplicate/invalid candidates
-          }
+
+        if (msg.type === "accept" && callStatus === "ringing") {
+          // Start peer connection to that user
+          await connectToPeer(msg.sender, true);
+          setCallStatus("connecting");
+        }
+
+        if (msg.type === "signal") {
+          await handleSignal(msg.sender, msg);
         }
       })
-      .subscribe((s) => {
+      .subscribe((s: any) => {
         if (s === "SUBSCRIBED") {
-          signalChannelRef.current = channel;
-          // If first to join, be the caller (initiator)
-          createPeerConnection(true);
+          callChannelRef.current = channel;
         }
       });
   };
 
-  const createPeerConnection = async (isInitiator: boolean) => {
-    const pc = new RTCPeerConnection(RTC_CONFIG);
-    peerConnectionRef.current = pc;
+  // --- INVITE LOGIC: handles both group & direct calls ---
+  const inviteUsers = async () => {
+    if (!callChannelRef.current) return;
+    setCallStatus("ringing");
+    callChannelRef.current.send({
+      type: "broadcast",
+      event: "groupcall",
+      payload: {
+        type: "invite",
+        sender: userId,
+      },
+    });
+  };
 
-    // Add local stream
-    if (mediaStream) {
-      mediaStream.getTracks().forEach((track) => pc.addTrack(track, mediaStream));
-    }
-    // Remote stream
-    const remoteStreamObj = new MediaStream();
-    setRemoteStream(remoteStreamObj);
+  // --- Accept/Decline handlers ---
+  const acceptCall = async () => {
+    setAcceptVisible(false);
+    setCallStatus("connecting");
+    // Notify inviter (and others) you accepted
+    callChannelRef.current?.send({
+      type: "broadcast",
+      event: "groupcall",
+      payload: {
+        type: "accept",
+        sender: userId,
+      },
+    });
+    // Connect with all other participants (mesh)
+    await connectToPeer(inviter!, false);
+  };
+  const declineCall = () => {
+    setAcceptVisible(false);
+    setCallStatus("ended");
+    callChannelRef.current?.send({
+      type: "broadcast",
+      event: "groupcall",
+      payload: {
+        type: "decline",
+        sender: userId,
+        target: inviter,
+      },
+    });
+    cleanup();
+    onClose();
+  };
+
+  // --- PEER CONNECTION MANAGEMENT (Group mesh) ---
+  const connectToPeer = async (peerId: string, isInitiator: boolean) => {
+    if (peerRefs.current[peerId]) return; // Already connected
+
+    const pc = new RTCPeerConnection(RTC_CONFIG);
+
+    // Attach local tracks
+    mediaStream?.getTracks().forEach((track) => pc.addTrack(track, mediaStream));
+
+    // Display remote stream
+    const remoteVideo = React.createRef<HTMLVideoElement>();
     pc.ontrack = (event) => {
-      if (remoteVideoRef.current) {
-        event.streams[0] &&
-          (remoteVideoRef.current.srcObject = event.streams[0]);
+      if (remoteVideo.current) {
+        remoteVideo.current.srcObject = event.streams[0];
       }
     };
 
-    // Handle ICE
+    // ICE handling
     pc.onicecandidate = (event) => {
-      if (event.candidate && signalChannelRef.current) {
-        signalChannelRef.current.send({
+      if (event.candidate && callChannelRef.current) {
+        callChannelRef.current.send({
           type: "broadcast",
-          event: "signal",
+          event: "groupcall",
           payload: {
-            candidate: event.candidate,
+            type: "signal",
             sender: userId,
+            candidate: event.candidate,
+            target: peerId,
           },
         });
       }
     };
 
-    // Handle connection state
+    // State changes
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === "connected") {
         setCallStatus("connected");
-      } else if (
+      }
+      if (
         pc.connectionState === "failed" ||
         pc.connectionState === "disconnected" ||
         pc.connectionState === "closed"
       ) {
         setCallStatus("ended");
+        setPeers((p) => {
+          delete p[peerId];
+          return { ...p };
+        });
       }
     };
 
-    // --- Initiator logic: send offer
+    peerRefs.current[peerId] = { id: peerId, pc, remoteVideoRef: remoteVideo };
+    setPeers((p) => ({ ...p, [peerId]: { id: peerId, pc, remoteVideoRef: remoteVideo } }));
+
     if (isInitiator) {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      if (signalChannelRef.current) {
-        signalChannelRef.current.send({
-          type: "broadcast",
-          event: "signal",
-          payload: { sdp: offer, sender: userId },
-        });
-      }
+      callChannelRef.current?.send({
+        type: "broadcast",
+        event: "groupcall",
+        payload: {
+          type: "signal",
+          sdp: offer,
+          sender: userId,
+          target: peerId,
+        },
+      });
     }
   };
 
-  // --- Modal Content UI ---
+  // --- Handle incoming offer/answer/ICE ---
+  const handleSignal = async (peerId: string, msg: GroupSignalData) => {
+    // Setup peer connection if not exists
+    if (!peerRefs.current[peerId]) {
+      await connectToPeer(peerId, false);
+    }
+    const pc = peerRefs.current[peerId]?.pc;
+    if (!pc) return;
+
+    if (msg.sdp) {
+      await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp!));
+      if (msg.sdp!.type === "offer") {
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        callChannelRef.current?.send({
+          type: "broadcast",
+          event: "groupcall",
+          payload: {
+            type: "signal",
+            sdp: answer,
+            sender: userId,
+            target: peerId,
+          },
+        });
+      }
+    }
+    if (msg.candidate) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
+      } catch (e) { }
+    }
+  };
+
+  // --- CLEANUP ---
+  const cleanup = () => {
+    Object.values(peerRefs.current).forEach(({ pc }) => pc.close());
+    setPeers({});
+    mediaStream?.getTracks().forEach((t) => t.stop());
+    setMediaStream(null);
+    if (callChannelRef.current) supabase.removeChannel(callChannelRef.current);
+    setAcceptVisible(false);
+    setInviter(null);
+    setCallStatus("ended");
+    setError(null);
+  };
+
+  // --- UI rendering for group: local + remote videos ---
+  const renderVideos = () => {
+    const peerVideos = Object.values(peers).map(({ id, remoteVideoRef }) => (
+      <div key={id} className="w-52 h-40 bg-gray-200 rounded-lg shadow flex items-center justify-center overflow-hidden ring-2 ring-purple-300 animate-fade-in mx-2">
+        <video
+          ref={remoteVideoRef}
+          autoPlay
+          playsInline
+          className="w-full h-full object-cover"
+          style={{ background: "#ccc" }}
+        />
+        <span className="absolute bottom-1 left-1 bg-black bg-opacity-30 px-2 rounded text-xs text-white">{id === inviter ? "Caller" : "User"}</span>
+      </div>
+    ));
+
+    return (
+      <div className="flex flex-wrap gap-3 items-center justify-center">
+        {/* Local video always first */}
+        <div className="w-52 h-40 bg-gray-200 rounded-lg shadow flex items-center justify-center overflow-hidden ring-2 ring-blue-300 animate-fade-in relative">
+          <video
+            ref={localVideoRef}
+            autoPlay
+            muted
+            playsInline
+            className="w-full h-full object-cover"
+            style={{ background: "#ccc" }}
+          />
+          <span className="absolute bottom-1 left-1 bg-black bg-opacity-30 px-2 rounded text-xs text-white">You</span>
+        </div>
+        {peerVideos}
+      </div>
+    );
+  };
+
+  // --- Modal UI ---
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg p-0 border-0 rounded-xl overflow-hidden shadow-2xl flex flex-col bg-white animate-scale-in">
+    <Dialog open={open} onOpenChange={() => { onClose(); cleanup(); }}>
+      <DialogContent className="max-w-xl p-0 border-0 rounded-xl overflow-hidden shadow-2xl flex flex-col bg-white animate-scale-in">
         <div className="bg-gradient-to-r from-blue-500 to-purple-600 py-2 px-4 flex items-center justify-between">
           <div className="flex items-center gap-2 text-white font-semibold text-lg">
             <Video className="w-5 h-5" />
@@ -217,50 +344,36 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
             variant="destructive"
             size="icon"
             className="border-white hover:bg-red-600"
-            onClick={onClose}
+            onClick={() => { onClose(); cleanup(); }}
           >
             <PhoneCall className="w-4 h-4" />
           </Button>
         </div>
-        <div className="flex flex-col items-center justify-center p-3 gap-3 bg-gray-50 sm:flex-row sm:gap-6 transition-all">
-          {/* Video Containers */}
-          <div className="w-56 h-40 bg-gray-200 rounded-lg shadow flex items-center justify-center overflow-hidden ring-2 ring-blue-300 animate-fade-in">
-            <video
-              ref={localVideoRef}
-              autoPlay
-              muted
-              playsInline
-              className="w-full h-full object-cover"
-              style={{ background: "#ccc" }}
-            />
-          </div>
-          <div className={`w-56 h-40 bg-gray-200 rounded-lg shadow flex items-center justify-center overflow-hidden ring-2 ring-purple-300 animate-fade-in ${callStatus === "idle" ? "opacity-40" : "opacity-100"}`}>
-            <video
-              ref={remoteVideoRef}
-              autoPlay
-              playsInline
-              className="w-full h-full object-cover"
-              style={{ background: "#ccc" }}
-            />
-          </div>
+        <div className="flex flex-col items-center justify-center p-3 gap-3 bg-gray-50 transition-all">
+          {renderVideos()}
         </div>
         <div className="flex flex-col gap-1 px-6 pb-4 text-center">
-          {error && (
-            <div className="text-red-700 text-sm font-medium animate-pulse">{error}</div>
+          {error && <div className="text-red-700 text-sm font-medium animate-pulse">{error}</div>}
+          {callStatus === "ringing" && <div className="text-blue-700 text-sm font-semibold animate-pulse">Calling other users...</div>}
+          {callStatus === "incoming" && (
+            <div className="text-yellow-800 font-semibold animate-pulse flex flex-col items-center gap-2">
+              <span>Incoming call...</span>
+              <div className="flex gap-3 justify-center">
+                <Button onClick={acceptCall} className="bg-green-600 text-white hover:bg-green-700">Accept</Button>
+                <Button onClick={declineCall} variant="destructive">Decline</Button>
+              </div>
+            </div>
           )}
-          {callStatus === "connecting" && (
-            <div className="text-blue-700 text-sm font-semibold animate-pulse">Connecting...</div>
-          )}
-          {callStatus === "connected" && (
-            <div className="text-green-700 text-sm font-semibold animate-fade-in">You are live!</div>
-          )}
-          {callStatus === "ended" && (
-            <div className="text-gray-700 text-sm font-semibold animate-fade-in">Call Ended</div>
-          )}
+          {callStatus === "connecting" && <div className="text-blue-700 text-sm font-semibold animate-pulse">Connecting...</div>}
+          {callStatus === "connected" && <div className="text-green-700 text-sm font-semibold animate-fade-in">You are live!</div>}
+          {callStatus === "ended" && <div className="text-gray-700 text-sm font-semibold animate-fade-in">Call Ended</div>}
         </div>
+        {/* Ringing Sound */}
+        <audio ref={ringingAudio} src="https://assets.mixkit.co/sfx/preview/mixkit-classic-alarm-995.mp3" loop hidden />
       </DialogContent>
     </Dialog>
   );
 };
 
 export default VideoCallModal;
+
