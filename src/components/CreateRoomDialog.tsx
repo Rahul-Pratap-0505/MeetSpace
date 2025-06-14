@@ -42,13 +42,18 @@ const CreateRoomDialog = ({ onRoomCreated }: CreateRoomDialogProps) => {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          className="w-full justify-start"
+        <Button
+          variant="ghost"
+          size="sm"
+          className={`
+            w-full justify-start
+            text-foreground 
+            dark:border dark:border-muted dark:bg-muted/60 dark:hover:bg-muted/80 dark:hover:border-primary
+            transition
+          `}
         >
           <Plus className="h-4 w-4 mr-2" />
-          <span className="text-foreground dark:text-foreground">
+          <span>
             Create Room
           </span>
         </Button>
