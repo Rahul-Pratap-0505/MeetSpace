@@ -38,6 +38,9 @@ const ChatPage = () => {
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useReactState(!isMobile);
 
+  // NEW: Track a local loading state for room switch UX
+  const [roomLoading, setRoomLoading] = useState(false);
+
   useEffect(() => {
     setSidebarOpen(!isMobile);
   }, [isMobile, currentRoom]);
@@ -82,11 +85,14 @@ const ChatPage = () => {
     handleTypingStop
   } = useChatPresence({ currentRoom, user });
 
+  // Handle room switching with perceived immediate content
   useEffect(() => {
-    if (currentRoom) {
-      fetchMessages();
-    }
-  }, [currentRoom, fetchMessages]);
+    if (!currentRoom) return;
+    setRoomLoading(true);
+    // Fetch new room messages, only update after fetch completes
+    fetchMessages().then(() => setRoomLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentRoom]);
 
   const handleSignOut = async () => {
     try {
@@ -126,7 +132,7 @@ const ChatPage = () => {
     return colors[colorIndex];
   };
 
-  if (loading) {
+  if (loading && !messages.length) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50">
         <div className="text-center animate-fade-in">
@@ -202,6 +208,7 @@ const ChatPage = () => {
           handleMessageDeleted={handleMessageDeleted}
           typingUserIds={typingUsers}
           presentUsers={presentUsers}
+          loading={roomLoading}
         />
         <ChatInput
           sendMessage={sendMessage}
