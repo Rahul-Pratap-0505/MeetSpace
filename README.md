@@ -3,7 +3,7 @@
 
 **MeetSpace** is a modern, full-stack real-time chat and video call platform, designed to help teams, friends, and communities communicate instantly and securely. Built with React, TypeScript, Supabase, and shadcn/ui, MeetSpace supports robust authentication, role-based admin operations, file sharing, theming, mobile/friendly UX, and scalable architecture.
 
-![MeetSpace Screenshot](public/placeholder.svg)
+
 
 ---
 
@@ -167,8 +167,6 @@ This project is [MIT](LICENSE) licensed.
 ## ✨ Credits
 
 Created by Rahul Pratap.
-
-Lovable AI and open source contributors.
 
 ---
 
