@@ -7,7 +7,7 @@ ALTER TABLE public.rooms
 -- UPDATE public.rooms SET created_by = '<some-admin-user-id>' WHERE created_by IS NULL;
 
 -- 3. Enable Row Level Security (RLS) if not already enabled
-ALTER TABLE public.rooms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.rooms ENABLE ROW LEVEL SECURITY;  
 
 -- 4. Only allow the creator to delete their own rooms
 DROP POLICY IF EXISTS "Authenticated users can delete rooms" ON public.rooms;
